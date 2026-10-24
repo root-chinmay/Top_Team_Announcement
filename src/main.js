@@ -5,7 +5,7 @@ import { soundEngine } from './audio.js';
 // Application State
 const state = {
   currentStep: 1, // 1 | 2 | 3
-  selectedCount: 3, // 1 | 2 | 3 | 5
+  selectedCount: 3, // Supports 1 to 50
   eventTitle: "GLOBAL INNOVATION HACKATHON 2026",
   eventSubtitle: "GRAND FINALE AWARDS CEREMONY",
   teams: [],
@@ -13,28 +13,59 @@ const state = {
   isMuted: false
 };
 
-// Preset demo team names for instant testing
-const sampleDataByCount = {
-  1: [
-    { rank: 1, name: "NeuralForge AI", tagline: "Autonomous Multi-Agent Robotics" }
-  ],
-  2: [
-    { rank: 2, name: "QuantumLeap", tagline: "Sub-atomic Encryption Protocol" },
-    { rank: 1, name: "NeuralForge AI", tagline: "Autonomous Multi-Agent Robotics" }
-  ],
-  3: [
-    { rank: 3, name: "Apex Innovators", tagline: "Zero-Carbon Distributed Grid" },
-    { rank: 2, name: "QuantumLeap", tagline: "Sub-atomic Encryption Protocol" },
-    { rank: 1, name: "CyberTitans", tagline: "Generative Surgical Robotics" }
-  ],
-  5: [
-    { rank: 5, name: "BioSynthetix", tagline: "Synthetic Protein Therapeutics" },
-    { rank: 4, name: "EchoVision Labs", tagline: "Spatial Holographic Neural UI" },
-    { rank: 3, name: "Apex Innovators", tagline: "Zero-Carbon Distributed Grid" },
-    { rank: 2, name: "QuantumLeap", tagline: "Sub-atomic Encryption Protocol" },
-    { rank: 1, name: "CyberTitans", tagline: "Generative Surgical Robotics" }
-  ]
-};
+// Rich pool of 50 unique, creative hackathon/competition team names
+const sampleTeamNamesPool = [
+  { name: "CyberTitans", tagline: "Generative Surgical Robotics" },
+  { name: "QuantumLeap", tagline: "Sub-atomic Encryption Protocol" },
+  { name: "Apex Innovators", tagline: "Zero-Carbon Distributed Grid" },
+  { name: "EchoVision Labs", tagline: "Spatial Holographic Neural UI" },
+  { name: "BioSynthetix", tagline: "Synthetic Protein Therapeutics" },
+  { name: "NeuralForge AI", tagline: "Autonomous Multi-Agent Systems" },
+  { name: "SolarVanguard", tagline: "Perovskite Solar Nanotech" },
+  { name: "NexusPrime", tagline: "Decentralized Compute Fabric" },
+  { name: "HyperDrive Systems", tagline: "Next-Gen EV Powertrains" },
+  { name: "VortexDynamics", tagline: "Deep Sea Oceanographic Sensing" },
+  { name: "AetherMind", tagline: "Cognitive Brain-Computer Interface" },
+  { name: "OmniPulse", tagline: "Autonomous Emergency Drone Fleets" },
+  { name: "IronClad Security", tagline: "Zero-Trust Quantum Defense" },
+  { name: "SkyWard Aero", tagline: "Electric Vertical Takeoff Flight" },
+  { name: "PulseLogic", tagline: "Ultra-Low Power Edge Silicon" },
+  { name: "TerraNova Biotech", tagline: "Carbon-Capture Soil Microbes" },
+  { name: "AuraHealth", tagline: "Real-time Diagnostic Biowearables" },
+  { name: "SpectraPhotonics", tagline: "Optical Neural Accelerators" },
+  { name: "Helios Energy", tagline: "Compact Fusion Plasma Magnets" },
+  { name: "Chronos AI", tagline: "High-Frequency Predictive Climate" },
+  { name: "SynthetixCore", tagline: "Protein Folding Simulation" },
+  { name: "ZeroGravity Labs", tagline: "Orbital Satellite Debris Scavengers" },
+  { name: "Aegis Robotics", tagline: "Disaster Search & Rescue Droids" },
+  { name: "MetaMorphix", tagline: "Programmable Smart Biomaterials" },
+  { name: "Titanium Forge", tagline: "Aerospace 3D Metal Additive" },
+  { name: "DeepBlue Intelligence", tagline: "Autonomous Submarine Exploration" },
+  { name: "PhotonWave", tagline: "Quantum LiDAR Sensor Arrays" },
+  { name: "NeuroLinker", tagline: "Motor Cortex Restoration Implant" },
+  { name: "BioShield Therapeutics", tagline: "CRISPR Epigenetic Regulators" },
+  { name: "Starlight Dynamics", tagline: "Deep Space Propulsion Units" },
+  { name: "CyberPulse", tagline: "Autonomous Intrusion Countermeasures" },
+  { name: "EchoLogic", tagline: "Ultrasonic Acoustic Metamaterials" },
+  { name: "SynapseWave", tagline: "Neuromorphic Sensor Processing" },
+  { name: "OmniGrid", tagline: "Self-Healing Citywide Microgrids" },
+  { name: "Solaris AI", tagline: "Space-Based Solar Microwave Relay" },
+  { name: "AeroVanguard", tagline: "Supersonic Commercial Aerodynamics" },
+  { name: "CryoLogic", tagline: "Solid-State Superconducting Logic" },
+  { name: "NanoForge", tagline: "Molecular Assembler Nanomachines" },
+  { name: "Vitalis Health", tagline: "Personalized mRNA Vaccines" },
+  { name: "Horizon Robotics", tagline: "Agricultural Autonomous Harvesters" },
+  { name: "Vektor Dynamics", tagline: "High-G Vector Thruster Tech" },
+  { name: "Prism Vision", tagline: "Hyper-spectral Medical Imagers" },
+  { name: "TerraPulse", tagline: "Planetary Seismological Warnings" },
+  { name: "QuantumMatrix", tagline: "Fault-Tolerant Topological Qubits" },
+  { name: "AetherShield", tagline: "Electromagnetic Defense Dome" },
+  { name: "BioForge Labs", tagline: "Enzymatic Plastic Upcycling" },
+  { name: "NexusAero", tagline: "Hydrogen Fuel Cell Aviation" },
+  { name: "CerebroTech", tagline: "Direct Cortical Vision Synthesis" },
+  { name: "NovaEnergy", tagline: "Geothermal Superheated Drilling" },
+  { name: "Apex Pioneers", tagline: "Extraterrestrial Habitation Pods" }
+];
 
 // DOM Elements
 let dom = {};
@@ -44,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDOMElements();
   initVideoEngine();
   attachEventListeners();
+  updateCountDisplay(state.selectedCount);
   renderStep(1);
 });
 
@@ -59,8 +91,13 @@ function initDOMElements() {
     step2Panel: document.getElementById('step2Panel'),
     step3Panel: document.getElementById('step3Panel'),
 
-    // Step 1 controls
-    optionCards: document.querySelectorAll('.option-card'),
+    // Step 1 controls (1 to 50 selector)
+    winnerCountInput: document.getElementById('winnerCountInput'),
+    winnerCountSlider: document.getElementById('winnerCountSlider'),
+    btnCountMinus: document.getElementById('btnCountMinus'),
+    btnCountPlus: document.getElementById('btnCountPlus'),
+    presetPills: document.querySelectorAll('.preset-pill'),
+    durationSummaryBadge: document.getElementById('durationSummaryBadge'),
     btnProceedToStep2: document.getElementById('btnProceedToStep2'),
 
     // Step 2 controls
@@ -71,6 +108,10 @@ function initDOMElements() {
     eventSubtitleInput: document.getElementById('eventSubtitleInput'),
     btnBackToStep1: document.getElementById('btnBackToStep1'),
     btnAutofill: document.getElementById('btnAutofill'),
+    btnToggleBulkPaste: document.getElementById('btnToggleBulkPaste'),
+    bulkPasteDrawer: document.getElementById('bulkPasteDrawer'),
+    bulkPasteInput: document.getElementById('bulkPasteInput'),
+    btnApplyBulkPaste: document.getElementById('btnApplyBulkPaste'),
     btnGenerateVideo: document.getElementById('btnGenerateVideo'),
 
     // Step 3 controls
@@ -130,20 +171,45 @@ function initVideoEngine() {
 }
 
 function attachEventListeners() {
-  // Step 1: Option Card Clicks
-  dom.optionCards.forEach(card => {
-    card.addEventListener('click', () => {
-      const count = parseInt(card.dataset.count, 10);
-      selectWinnerCount(count);
-    });
+  // Step 1: Number input change
+  dom.winnerCountInput.addEventListener('input', (e) => {
+    let val = parseInt(e.target.value, 10);
+    if (isNaN(val)) val = 1;
+    val = Math.max(1, Math.min(50, val));
+    updateCountDisplay(val);
+  });
 
-    // Keyboard navigation (Enter / Space)
-    card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        const count = parseInt(card.dataset.count, 10);
-        selectWinnerCount(count);
-      }
+  dom.winnerCountInput.addEventListener('blur', (e) => {
+    let val = parseInt(e.target.value, 10);
+    if (isNaN(val) || val < 1) val = 1;
+    if (val > 50) val = 50;
+    e.target.value = val;
+    updateCountDisplay(val);
+  });
+
+  // Step 1: Slider input
+  dom.winnerCountSlider.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    updateCountDisplay(val);
+  });
+
+  // Step 1: Minus Button
+  dom.btnCountMinus.addEventListener('click', () => {
+    const nextVal = Math.max(1, state.selectedCount - 1);
+    updateCountDisplay(nextVal);
+  });
+
+  // Step 1: Plus Button
+  dom.btnCountPlus.addEventListener('click', () => {
+    const nextVal = Math.min(50, state.selectedCount + 1);
+    updateCountDisplay(nextVal);
+  });
+
+  // Step 1: Preset Pills
+  dom.presetPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      const count = parseInt(pill.dataset.count, 10);
+      updateCountDisplay(count);
     });
   });
 
@@ -155,6 +221,19 @@ function attachEventListeners() {
   // Step 2: Back Button
   dom.btnBackToStep1.addEventListener('click', () => {
     renderStep(1);
+  });
+
+  // Step 2: Toggle Bulk Paste Drawer
+  dom.btnToggleBulkPaste.addEventListener('click', () => {
+    dom.bulkPasteDrawer.classList.toggle('active');
+    if (dom.bulkPasteDrawer.classList.contains('active')) {
+      dom.bulkPasteInput.focus();
+    }
+  });
+
+  // Step 2: Apply Bulk Paste
+  dom.btnApplyBulkPaste.addEventListener('click', () => {
+    applyBulkPaste();
   });
 
   // Step 2: Auto-fill Demo Data
@@ -276,17 +355,31 @@ function attachEventListeners() {
   });
 }
 
-// Select Winner Count in Step 1
-function selectWinnerCount(count) {
-  state.selectedCount = count;
-  dom.optionCards.forEach(card => {
-    const isSelected = parseInt(card.dataset.count, 10) === count;
-    card.classList.toggle('selected', isSelected);
-    card.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+// Update the 1-50 Count Display across input, slider, preset pills, and duration badge
+function updateCountDisplay(val) {
+  state.selectedCount = val;
+
+  dom.winnerCountInput.value = val;
+  dom.winnerCountSlider.value = val;
+
+  dom.btnCountMinus.disabled = val <= 1;
+  dom.btnCountPlus.disabled = val >= 50;
+
+  // Highlight active preset if matches exactly
+  dom.presetPills.forEach(pill => {
+    const pCount = parseInt(pill.dataset.count, 10);
+    pill.classList.toggle('active', pCount === val);
   });
 
-  // Smooth highlight feedback
-  dom.btnProceedToStep2.focus();
+  // Calculate Ceremony Duration: 3.5s intro + (3s countdown + 10s reveal per team) + 6.0s podium
+  const totalSeconds = 3.5 + val * 13.0 + 6.0;
+  const m = Math.floor(totalSeconds / 60);
+  const s = Math.round(totalSeconds % 60);
+  const timeStr = m > 0 ? `${m}m ${s}s` : `${s}s`;
+
+  dom.durationSummaryBadge.innerHTML = `
+    <span>⏱ Estimated Ceremony: ~${timeStr} (3s Countdown + 10s Reveal per Team)</span>
+  `;
 }
 
 // Render active Step (1, 2, or 3)
@@ -318,20 +411,15 @@ function renderStep(stepNumber) {
   }
 }
 
-// STEP 2: Dynamically Generate the Exact Required Team Inputs
-// Following prompt instructions:
-// If Top 3:
-// "Enter the 3rd Place Team Name:"
-// "Enter the 2nd Place Team Name:"
-// "Enter the 1st Place Team Name:"
-// If Top 5: 5th, 4th, 3rd, 2nd, 1st
+// STEP 2: Dynamically Generate the Exact Required Team Inputs for any number (1 to 50)
 function setupStep2Form() {
   const count = state.selectedCount;
   dom.selectedWinnerCountBadge.textContent = `🏆 Announcing: Top ${count} Winner${count > 1 ? 's' : ''}`;
 
   dom.dynamicTeamsContainer.innerHTML = '';
+  dom.bulkPasteDrawer.classList.remove('active');
 
-  // Order of questions: Reveal order from highest number down to 1st place!
+  // Order of questions: Reveal order from highest rank down to 1st place!
   // E.g. for Top 3: 3rd, 2nd, 1st
   // E.g. for Top 5: 5th, 4th, 3rd, 2nd, 1st
   const rankOrder = [];
@@ -382,7 +470,7 @@ function setupStep2Form() {
             class="validated-input"
             required 
             minlength="2"
-            maxlength="32"
+            maxlength="36"
             value="${escapeHtml(defaultName)}"
             placeholder="e.g. CyberTitans"
             aria-describedby="teamHint_${rank}"
@@ -431,17 +519,41 @@ function escapeHtml(text) {
   return text.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Quick Fill Sample Teams for testing
+// Quick Fill Sample Teams for testing (Supports up to 50 teams)
 function fillSampleTeams() {
   const count = state.selectedCount;
-  const samples = sampleDataByCount[count] || sampleDataByCount[3];
 
-  samples.forEach(item => {
-    const nameInput = document.getElementById(`teamName_${item.rank}`);
-    const tagInput = document.getElementById(`teamTagline_${item.rank}`);
-    if (nameInput) nameInput.value = item.name;
-    if (tagInput) tagInput.value = item.tagline;
+  // Rank 1 gets the top pool item, rank 2 gets 2nd, etc.
+  for (let r = 1; r <= count; r++) {
+    const sample = sampleTeamNamesPool[(r - 1) % sampleTeamNamesPool.length];
+    const nameInput = document.getElementById(`teamName_${r}`);
+    const tagInput = document.getElementById(`teamTagline_${r}`);
+    if (nameInput) nameInput.value = `${sample.name}${r > sampleTeamNamesPool.length ? ' #' + r : ''}`;
+    if (tagInput) tagInput.value = sample.tagline;
+  }
+}
+
+// Bulk Paste Names: Parses lines and fills inputs
+function applyBulkPaste() {
+  const rawText = dom.bulkPasteInput.value.trim();
+  if (!rawText) return;
+
+  const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const count = state.selectedCount;
+
+  // Check if lines were pasted 1st to Nth or Nth to 1st
+  // If first line starts with 1 or user pasted normally:
+  lines.forEach((line, idx) => {
+    // Clean leading rank numbers if any (e.g. "1. CyberTitans" -> "CyberTitans")
+    const cleanName = line.replace(/^\d+[\.\)\-\:\s]+/, '').trim();
+    const rank = idx + 1; // 1st, 2nd, 3rd...
+    if (rank <= count) {
+      const nameInput = document.getElementById(`teamName_${rank}`);
+      if (nameInput) nameInput.value = cleanName;
+    }
   });
+
+  dom.bulkPasteDrawer.classList.remove('active');
 }
 
 // Handle Form Submission in Step 2 -> Transition to Step 3
@@ -504,7 +616,17 @@ function buildTimelineMarkers() {
   dom.timelineMarkersTrack.innerHTML = '';
   const total = videoEngine.duration;
 
-  videoEngine.sceneSchedule.forEach(scene => {
+  // Filter scenes to display cleanly on the timeline track
+  // For small counts, show all. For large counts (e.g. > 10), show intro, podium, 1st, 2nd, 3rd, and major milestones
+  const allScenes = videoEngine.sceneSchedule;
+  const filteredScenes = allScenes.filter(scene => {
+    if (allScenes.length <= 14) return true;
+    if (scene.type === 'intro' || scene.type === 'podium' || scene.type === 'champion' || scene.type === 'champion_countdown') return true;
+    if (scene.type === 'rank' && (scene.rank <= 3 || scene.rank % 5 === 0)) return true;
+    return false;
+  });
+
+  filteredScenes.forEach(scene => {
     const marker = document.createElement('span');
     marker.className = 'scene-marker';
     marker.textContent = scene.label;

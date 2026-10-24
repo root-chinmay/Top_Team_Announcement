@@ -65,8 +65,8 @@ export class VideoEngine {
     this.firedEvents.clear();
 
     let t = 0;
-    // Scene 0: Epic Intro
-    const introDuration = 3.8;
+    // Scene 0: Epic Intro (Opening Sting)
+    const introDuration = 3.5;
     this.sceneSchedule.push({
       type: 'intro',
       start: t,
@@ -76,56 +76,72 @@ export class VideoEngine {
     t += introDuration;
 
     // Reveal order: from lowest rank up to 2nd
-    // teams array is expected to be sorted or we sort it descending: 5, 4, 3, 2, 1
+    // teams array is sorted descending: N, N-1, ... 2, 1
     const sortedTeams = [...this.teams].sort((a, b) => b.rank - a.rank);
 
     // Filter non-1st place teams first
     const runnerUps = sortedTeams.filter(team => team.rank > 1);
     const champion = sortedTeams.find(team => team.rank === 1) || sortedTeams[0];
 
-    const revealDuration = this.winnerCount === 5 ? 4.0 : (this.winnerCount === 3 ? 5.0 : 6.0);
+    // Every team announcement has:
+    // 1. A 3-second visual countdown timer shown on screen
+    // 2. A 10-second team reveal display
+    const countdownDuration = 3.0;
+    const teamRevealDuration = 10.0;
 
     for (let team of runnerUps) {
+      // 3-Second Countdown Scene before declaring team
+      this.sceneSchedule.push({
+        type: 'countdown',
+        rank: team.rank,
+        isChampion: false,
+        start: t,
+        end: t + countdownDuration,
+        label: `⏳ ${this.getRankOrdinal(team.rank)} (3s)`
+      });
+      t += countdownDuration;
+
+      // 10-Second Team Name Announcement Scene
       this.sceneSchedule.push({
         type: 'rank',
         rank: team.rank,
         team: team,
         start: t,
-        end: t + revealDuration,
+        end: t + teamRevealDuration,
         label: `${this.getRankOrdinal(team.rank)} Place`
       });
-      t += revealDuration;
+      t += teamRevealDuration;
     }
 
-    // Suspense before 1st Place reveal
-    const suspenseDuration = 2.4;
+    // 1st Place Grand Champion 3-Second Countdown
     this.sceneSchedule.push({
-      type: 'suspense',
+      type: 'champion_countdown',
+      rank: 1,
+      isChampion: true,
       start: t,
-      end: t + suspenseDuration,
-      label: 'Champion Suspense'
+      end: t + countdownDuration,
+      label: '⏳ Champion (3s)'
     });
-    t += suspenseDuration;
+    t += countdownDuration;
 
-    // 1st Place Grand Champion Reveal
-    const championDuration = 7.5;
+    // 1st Place Grand Champion 10-Second Climax Reveal
     this.sceneSchedule.push({
       type: 'champion',
       rank: 1,
       team: champion,
       start: t,
-      end: t + championDuration,
+      end: t + teamRevealDuration,
       label: '🏆 1st Place Champion'
     });
-    t += championDuration;
+    t += teamRevealDuration;
 
-    // Grand Podium Outro
-    const outroDuration = 4.0;
+    // Grand Podium / Leaderboard Outro
+    const outroDuration = 6.0;
     this.sceneSchedule.push({
       type: 'podium',
       start: t,
       end: t + outroDuration,
-      label: 'Podium & Fireworks'
+      label: 'Podium & Leaderboard'
     });
     t += outroDuration;
 
@@ -209,7 +225,35 @@ export class VideoEngine {
   // Check and trigger sound/visual events based on current time
   checkAudioEvents(t) {
     for (let scene of this.sceneSchedule) {
-      // Reveal sound
+      // 3-Second Countdown Audio Ticks (3, 2, 1) and tension
+      if (scene.type === 'countdown' || scene.type === 'champion_countdown') {
+        const tick3Key = `tick3_${scene.start.toFixed(2)}`;
+        const tick2Key = `tick2_${scene.start.toFixed(2)}`;
+        const tick1Key = `tick1_${scene.start.toFixed(2)}`;
+        const whooshKey = `whoosh_${scene.start.toFixed(2)}`;
+
+        if (t >= scene.start && !this.firedEvents.has(tick3Key)) {
+          this.firedEvents.add(tick3Key);
+          soundEngine.playCountdownTick(3);
+          if (scene.type === 'champion_countdown') {
+            soundEngine.playDrumroll(2.8);
+          }
+        }
+        if (t >= scene.start + 1.0 && !this.firedEvents.has(tick2Key)) {
+          this.firedEvents.add(tick2Key);
+          soundEngine.playCountdownTick(2);
+        }
+        if (t >= scene.start + 2.0 && !this.firedEvents.has(tick1Key)) {
+          this.firedEvents.add(tick1Key);
+          soundEngine.playCountdownTick(1);
+        }
+        if (t >= scene.start + 2.4 && !this.firedEvents.has(whooshKey)) {
+          this.firedEvents.add(whooshKey);
+          soundEngine.playWhoosh(0.7);
+        }
+      }
+
+      // Reveal sound & visual triggers
       const revealKey = `reveal_${scene.type}_${scene.rank || 0}@${scene.start.toFixed(2)}`;
       if (t >= scene.start && !this.firedEvents.has(revealKey)) {
         this.firedEvents.add(revealKey);
@@ -228,9 +272,6 @@ export class VideoEngine {
             '#ffffff'
           ]);
           this.particles.addConfetti(60, scene.rank === 1);
-        } else if (scene.type === 'suspense') {
-          soundEngine.playDrumroll(2.2);
-          soundEngine.playWhoosh(2.0);
         } else if (scene.type === 'champion') {
           soundEngine.playChampionFanfare();
           this.shakeAmount = 28; // Massive screen shake
@@ -340,11 +381,12 @@ export class VideoEngine {
         case 'intro':
           this.renderIntroScene(sceneProgress, time);
           break;
+        case 'countdown':
+        case 'champion_countdown':
+          this.renderCountdownScene(activeScene.rank, activeScene.isChampion, sceneProgress, time);
+          break;
         case 'rank':
           this.renderRankScene(activeScene.team, activeScene.rank, sceneProgress, time);
-          break;
-        case 'suspense':
-          this.renderSuspenseScene(sceneProgress, time);
           break;
         case 'champion':
           this.renderChampionScene(activeScene.team, sceneProgress, time);
@@ -539,9 +581,9 @@ export class VideoEngine {
 
     const rankInfo = this.getRankColor(rank);
 
-    // Smooth reveal animation curve (easeOutBack)
-    const enterTime = 0.2;
-    const exitTime = 0.85;
+    // 10-second display: entrance (first 0.6s), steady readable name (8.8s), exit fade (last 0.6s)
+    const enterTime = 0.06;
+    const exitTime = 0.94;
     let animProgress = 1.0;
     let alpha = 1.0;
 
@@ -573,7 +615,7 @@ export class VideoEngine {
     ctx.shadowBlur = 25;
     ctx.fillText(`${this.getRankOrdinal(rank)} PLACE`, 0, -40);
 
-    // 3. TEAM NAME — Large, Centered, and Crystal Clear
+    // 3. TEAM NAME — Large, Centered, and Crystal Clear (Displayed for 10s)
     ctx.font = '900 82px "Syne", "Montserrat", sans-serif';
     ctx.letterSpacing = '2px';
 
@@ -616,70 +658,134 @@ export class VideoEngine {
     ctx.restore();
   }
 
-  // Suspense Scene before 1st Place Champion
-  renderSuspenseScene(progress, time) {
+  // 3-SECOND VISUAL COUNTDOWN SHOWN ON SCREEN BEFORE REVEALING EACH TEAM
+  renderCountdownScene(rank, isChampion, progress, time) {
     const ctx = this.ctx;
     const cx = this.width / 2;
     const cy = this.height / 2;
 
+    const ordinal = this.getRankOrdinal(rank);
+    const rankInfo = this.getRankColor(rank);
+    const accentColor = isChampion ? '#ffd700' : rankInfo.primary;
+
     ctx.save();
 
-    // Dim the stadium lights to near blackout
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    // Cinematic background glow
+    const glowGrad = ctx.createRadialGradient(cx, cy, 30, cx, cy, 650);
+    if (isChampion) {
+      glowGrad.addColorStop(0, 'rgba(255, 215, 0, 0.22)');
+      glowGrad.addColorStop(0.5, 'rgba(30, 20, 4, 0.65)');
+      glowGrad.addColorStop(1, 'rgba(5, 4, 2, 0.95)');
+    } else {
+      glowGrad.addColorStop(0, 'rgba(0, 242, 254, 0.16)');
+      glowGrad.addColorStop(0.5, 'rgba(8, 14, 26, 0.65)');
+      glowGrad.addColorStop(1, 'rgba(3, 4, 10, 0.95)');
+    }
+    ctx.fillStyle = glowGrad;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    // Pulsing converging energy ring
-    const pulse = Math.sin(time * 12) * 20;
-    const radius = 180 + pulse;
+    // Calculate countdown second: 3, 2, 1
+    const elapsedSec = Math.min(2.99, progress * 3.0);
+    const currentNum = 3 - Math.floor(elapsedSec); // 3, 2, 1
+    const secondFraction = elapsedSec - Math.floor(elapsedSec); // 0 to 1
 
-    const ringGrad = ctx.createRadialGradient(cx, cy, 50, cx, cy, radius + 80);
-    ringGrad.addColorStop(0, 'rgba(255, 215, 0, 0.25)');
-    ringGrad.addColorStop(0.8, 'rgba(255, 215, 0, 0.05)');
-    ringGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    // Scale pop on each second tick
+    const numScale = 1.0 + Math.max(0, 1 - secondFraction * 2.4) * 0.4;
 
-    ctx.fillStyle = ringGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius + 80, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Pulsing Golden Ring
-    ctx.strokeStyle = '#ffd700';
-    ctx.lineWidth = 4;
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur = 35;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Suspense Text
+    // 1. Top HUD Category Pill
     ctx.textAlign = 'center';
-    ctx.font = '800 34px "Orbitron", sans-serif';
-    ctx.letterSpacing = '10px';
-    ctx.fillStyle = '#ffea00';
-    ctx.shadowColor = '#ffea00';
-    ctx.shadowBlur = 20;
-    ctx.fillText("AND NOW...", cx, cy - 30);
+    ctx.font = '800 22px "Orbitron", sans-serif';
+    ctx.letterSpacing = '8px';
+    ctx.fillStyle = accentColor;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 18;
+    ctx.fillText(isChampion ? "★ GRAND CHAMPION ANNOUNCEMENT ★" : "★ UPCOMING WINNER REVEAL ★", cx, cy - 220);
 
-    ctx.font = '900 48px "Syne", "Montserrat", sans-serif';
-    ctx.letterSpacing = '6px';
+    // 2. Main Announcement Label
+    ctx.font = '900 46px "Syne", "Montserrat", sans-serif';
+    ctx.letterSpacing = '4px';
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = '#ffffff';
-    ctx.shadowBlur = 30;
-    ctx.fillText("THE 1ST PLACE WINNER IS...", cx, cy + 40);
+    ctx.shadowBlur = 25;
+    const announceLabel = isChampion ? "ANNOUNCING 1ST PLACE" : `ANNOUNCING ${ordinal} PLACE`;
+    ctx.fillText(announceLabel, cx, cy - 160);
+
+    // 3. Central Circular Countdown Gauge
+    const clockY = cy + 25;
+    const clockRadius = 115;
+
+    // Background Circle Track
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    ctx.arc(cx, clockY, clockRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Animated Circular Arc Progress (Sweeps 360 degrees over 3 seconds)
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 16;
+    ctx.lineCap = 'round';
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 35;
+
+    ctx.beginPath();
+    const startAngle = -Math.PI / 2;
+    const sweepAngle = (1 - progress) * (Math.PI * 2);
+    ctx.arc(cx, clockY, clockRadius, startAngle, startAngle + sweepAngle, false);
+    ctx.stroke();
+
+    // Sonar pulse ring on each second
+    const pulseRadius = clockRadius + secondFraction * 65;
+    const pulseAlpha = Math.max(0, (1 - secondFraction) * 0.7);
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 4;
+    ctx.globalAlpha = pulseAlpha;
+    ctx.beginPath();
+    ctx.arc(cx, clockY, pulseRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
+
+    // 4. Large Bold Number in Center (3, 2, 1)
+    ctx.save();
+    ctx.translate(cx, clockY);
+    ctx.scale(numScale, numScale);
+
+    ctx.font = '900 130px "Orbitron", sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 45;
+    ctx.fillText(`${currentNum}`, 0, 6);
+
+    ctx.restore();
+
+    // 5. Bottom Urgency Prompt
+    ctx.font = '700 20px "Orbitron", sans-serif';
+    ctx.letterSpacing = '6px';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.shadowColor = '#000000';
+    ctx.shadowBlur = 10;
+    ctx.fillText("PREPARE FOR THE REVEAL", cx, cy + 215);
 
     ctx.restore();
   }
 
-  // 1ST PLACE GRAND CHAMPION — THE MOST DRAMATIC AND SPECTACULAR REVEAL
+  // 1ST PLACE GRAND CHAMPION — THE MOST DRAMATIC AND SPECTACULAR REVEAL (10 SECONDS)
   renderChampionScene(team, progress, time) {
     const ctx = this.ctx;
     const cx = this.width / 2;
     const cy = this.height / 2;
 
-    const enterTime = 0.16;
+    const enterTime = 0.06;
+    const exitTime = 0.94;
     let animProgress = 1.0;
+    let alpha = 1.0;
+
     if (progress < enterTime) {
       animProgress = progress / enterTime;
+      alpha = animProgress;
+    } else if (progress > exitTime) {
+      alpha = 1 - (progress - exitTime) / (1 - exitTime);
     }
 
     ctx.save();
@@ -801,80 +907,151 @@ export class VideoEngine {
     const sortedTeams = [...this.teams].sort((a, b) => a.rank - b.rank); // 1, 2, 3, 4, 5
     const count = sortedTeams.length;
 
-    // Podium Layout order:
-    // For Top 3: 2nd (left), 1st (center high), 3rd (right)
-    // For Top 5: 4th, 2nd, 1st, 3rd, 5th
-    let displayOrder = [];
-    if (count === 1) {
-      displayOrder = [sortedTeams[0]];
-    } else if (count === 2) {
-      displayOrder = [sortedTeams[1], sortedTeams[0]]; // 2nd, 1st
-    } else if (count === 3) {
-      displayOrder = [sortedTeams[1], sortedTeams[0], sortedTeams[2]]; // 2nd, 1st, 3rd
+    if (count <= 5) {
+      // Podium Layout order for up to 5 teams
+      let displayOrder = [];
+      if (count === 1) {
+        displayOrder = [sortedTeams[0]];
+      } else if (count === 2) {
+        displayOrder = [sortedTeams[1], sortedTeams[0]]; // 2nd, 1st
+      } else if (count === 3) {
+        displayOrder = [sortedTeams[1], sortedTeams[0], sortedTeams[2]]; // 2nd, 1st, 3rd
+      } else if (count === 4) {
+        displayOrder = [sortedTeams[3], sortedTeams[1], sortedTeams[0], sortedTeams[2]]; // 4th, 2nd, 1st, 3rd
+      } else {
+        // 5 teams: 4th, 2nd, 1st, 3rd, 5th
+        displayOrder = [
+          sortedTeams[3],
+          sortedTeams[1],
+          sortedTeams[0],
+          sortedTeams[2],
+          sortedTeams[4]
+        ].filter(Boolean);
+      }
+
+      const totalCols = displayOrder.length;
+      const colWidth = Math.min(260, (w * 0.85) / totalCols);
+      const startX = (w - (totalCols * colWidth + (totalCols - 1) * 30)) / 2 + colWidth / 2;
+
+      displayOrder.forEach((team, idx) => {
+        const x = startX + idx * (colWidth + 30);
+        const rankInfo = this.getRankColor(team.rank);
+
+        let podiumHeight = 180;
+        if (team.rank === 1) podiumHeight = 300;
+        else if (team.rank === 2) podiumHeight = 240;
+        else if (team.rank === 3) podiumHeight = 190;
+        else podiumHeight = 140;
+
+        const podiumTop = h - 140 - podiumHeight;
+
+        const pedGrad = ctx.createLinearGradient(x - colWidth / 2, podiumTop, x + colWidth / 2, h - 140);
+        pedGrad.addColorStop(0, rankInfo.secondary);
+        pedGrad.addColorStop(1, '#0e111a');
+
+        ctx.fillStyle = pedGrad;
+        ctx.strokeStyle = rankInfo.primary;
+        ctx.lineWidth = team.rank === 1 ? 3.5 : 2;
+        ctx.shadowColor = rankInfo.glow;
+        ctx.shadowBlur = team.rank === 1 ? 25 : 12;
+
+        ctx.beginPath();
+        ctx.roundRect(x - colWidth / 2, podiumTop, colWidth, podiumHeight, [12, 12, 0, 0]);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = '900 48px "Orbitron", sans-serif';
+        ctx.fillStyle = rankInfo.primary;
+        ctx.fillText(`${team.rank}`, x, podiumTop + 65);
+
+        ctx.font = '700 16px "Orbitron", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.letterSpacing = '2px';
+        ctx.fillText(`${this.getRankOrdinal(team.rank)}`, x, podiumTop + 95);
+
+        this.renderMiniMedal(x, podiumTop - 65, team.rank);
+
+        ctx.font = team.rank === 1 ? '900 28px "Syne", sans-serif' : '700 22px "Syne", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = rankInfo.glow;
+        ctx.shadowBlur = 15;
+        ctx.fillText(team.name, x, podiumTop - 110);
+      });
     } else {
-      // 5 teams
-      displayOrder = [
-        sortedTeams[3], // 4th
-        sortedTeams[1], // 2nd
-        sortedTeams[0], // 1st
-        sortedTeams[2], // 3rd
-        sortedTeams[4]  // 5th
-      ].filter(Boolean);
+      // Extended Top 6 to Top 50 Leaderboard View
+      // 1. Center elevated podium for Top 3
+      const top3 = [sortedTeams[1], sortedTeams[0], sortedTeams[2]].filter(Boolean); // 2nd, 1st, 3rd
+      const podiumStartX = w / 2 - 270;
+      top3.forEach((team, idx) => {
+        const x = podiumStartX + idx * 270;
+        const rankInfo = this.getRankColor(team.rank);
+        const pHeight = team.rank === 1 ? 200 : (team.rank === 2 ? 155 : 125);
+        const pTop = 415 - pHeight;
+
+        ctx.fillStyle = rankInfo.secondary;
+        ctx.strokeStyle = rankInfo.primary;
+        ctx.lineWidth = team.rank === 1 ? 3 : 2;
+        ctx.shadowColor = rankInfo.glow;
+        ctx.shadowBlur = 15;
+
+        ctx.beginPath();
+        ctx.roundRect(x - 115, pTop, 230, pHeight, [10, 10, 0, 0]);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = '900 42px "Orbitron", sans-serif';
+        ctx.fillStyle = rankInfo.primary;
+        ctx.fillText(`${team.rank}`, x, pTop + 55);
+
+        this.renderMiniMedal(x, pTop - 45, team.rank);
+
+        ctx.font = '900 24px "Syne", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(team.name, x, pTop - 75);
+      });
+
+      // 2. Multi-column grid for ranks 4 through N (up to 50)
+      const otherTeams = sortedTeams.slice(3);
+      const cols = count > 24 ? 5 : 4;
+      const cardW = (w * 0.9) / cols;
+      const cardH = 40;
+      const startGridY = 460;
+      const startGridX = (w - (cols * cardW)) / 2;
+
+      const maxShow = Math.min(otherTeams.length, 35);
+      for (let i = 0; i < maxShow; i++) {
+        const team = otherTeams[i];
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const cardX = startGridX + col * cardW + 6;
+        const cardY = startGridY + row * (cardH + 8);
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(cardX, cardY, cardW - 12, cardH, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.textAlign = 'left';
+        ctx.font = '700 14px "Orbitron", sans-serif';
+        ctx.fillStyle = '#00f2fe';
+        ctx.fillText(`${team.rank}.`, cardX + 12, cardY + 25);
+
+        ctx.font = '600 15px "Outfit", sans-serif';
+        ctx.fillStyle = '#f8fafc';
+        const displayLabel = team.name.length > 20 ? team.name.substring(0, 18) + '...' : team.name;
+        ctx.fillText(displayLabel, cardX + 46, cardY + 25);
+      }
+
+      if (otherTeams.length > maxShow) {
+        ctx.textAlign = 'center';
+        ctx.font = '600 16px "Orbitron", sans-serif';
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.8)';
+        ctx.fillText(`+ ${otherTeams.length - maxShow} more winning finalists`, w / 2, h - 35);
+      }
     }
-
-    const totalCols = displayOrder.length;
-    const colWidth = Math.min(260, (w * 0.85) / totalCols);
-    const startX = (w - (totalCols * colWidth + (totalCols - 1) * 30)) / 2 + colWidth / 2;
-
-    displayOrder.forEach((team, idx) => {
-      const x = startX + idx * (colWidth + 30);
-      const rankInfo = this.getRankColor(team.rank);
-
-      // Heights: 1st is highest
-      let podiumHeight = 180;
-      if (team.rank === 1) podiumHeight = 300;
-      else if (team.rank === 2) podiumHeight = 240;
-      else if (team.rank === 3) podiumHeight = 190;
-      else podiumHeight = 140;
-
-      const podiumTop = h - 140 - podiumHeight;
-
-      // Draw Podium Pedestal
-      const pedGrad = ctx.createLinearGradient(x - colWidth / 2, podiumTop, x + colWidth / 2, h - 140);
-      pedGrad.addColorStop(0, rankInfo.secondary);
-      pedGrad.addColorStop(1, '#0e111a');
-
-      ctx.fillStyle = pedGrad;
-      ctx.strokeStyle = rankInfo.primary;
-      ctx.lineWidth = team.rank === 1 ? 3.5 : 2;
-      ctx.shadowColor = rankInfo.glow;
-      ctx.shadowBlur = team.rank === 1 ? 25 : 12;
-
-      ctx.beginPath();
-      ctx.roundRect(x - colWidth / 2, podiumTop, colWidth, podiumHeight, [12, 12, 0, 0]);
-      ctx.fill();
-      ctx.stroke();
-
-      // Rank Label on Pedestal
-      ctx.font = '900 48px "Orbitron", sans-serif';
-      ctx.fillStyle = rankInfo.primary;
-      ctx.fillText(`${team.rank}`, x, podiumTop + 65);
-
-      ctx.font = '700 16px "Orbitron", sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.letterSpacing = '2px';
-      ctx.fillText(`${this.getRankOrdinal(team.rank)}`, x, podiumTop + 95);
-
-      // Mini Medal floating above pedestal
-      this.renderMiniMedal(x, podiumTop - 65, team.rank);
-
-      // Team Name above pedestal
-      ctx.font = team.rank === 1 ? '900 28px "Syne", sans-serif' : '700 22px "Syne", sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.shadowColor = rankInfo.glow;
-      ctx.shadowBlur = 15;
-      ctx.fillText(team.name, x, podiumTop - 110);
-    });
 
     ctx.restore();
   }

@@ -64,68 +64,79 @@
     </nav>
 
     <!-- ============================================================
-         STEP 1: SELECT NUMBER OF WINNING TEAMS
+         STEP 1: SELECT NUMBER OF WINNING TEAMS (1 to 50)
          ============================================================ -->
     <section id="step1Panel" class="wizard-panel active" aria-labelledby="step1Title">
       <div class="section-header">
         <span class="badge-tag">Step 1 of 3</span>
         <h2 id="step1Title" class="main-question">How many top teams do you want to announce?</h2>
-        <p class="section-desc">Select the winner ceremony format for your competition. Team names will be requested in the next step.</p>
+        <p class="section-desc">Select any number from 1 to 50. Each team receives a 3-second visual countdown followed by a 10-second reveal.</p>
       </div>
 
-      <!-- 4 Selectable Cards: Top 1, Top 2, Top 3, Top 5 -->
-      <div class="winner-options-grid" role="radiogroup" aria-label="Number of Top Teams">
+      <!-- INTERACTIVE 1-50 NUMBER SELECTOR -->
+      <div class="count-selector-shell">
         
-        <!-- TOP 1 OPTION -->
-        <div class="option-card" data-count="1" tabindex="0" role="radio" aria-checked="false" id="optTop1">
-          <div class="card-icon-wrap" aria-hidden="true">👑</div>
-          <h3 class="card-title">Top 1</h3>
-          <p class="card-subtitle">Ultimate Grand Champion Solo Spotlight</p>
-          <div class="card-podium-preview" aria-hidden="true">
-            <div class="podium-bar gold" title="1st Place Champion"></div>
+        <!-- COUNTER CONTROLS -->
+        <div class="count-counter-wrap">
+          <button type="button" id="btnCountMinus" class="counter-btn" aria-label="Decrease team count">−</button>
+          
+          <div class="count-digital-display">
+            <input 
+              type="number" 
+              id="winnerCountInput" 
+              class="count-number-input" 
+              min="1" 
+              max="50" 
+              value="3" 
+              aria-label="Number of Top Teams to Announce"
+            >
+            <span class="count-unit-label">Top Teams Selected</span>
           </div>
-          <span class="card-time-badge">⏱ ~26s Video</span>
+
+          <button type="button" id="btnCountPlus" class="counter-btn" aria-label="Increase team count">+</button>
         </div>
 
-        <!-- TOP 2 OPTION -->
-        <div class="option-card" data-count="2" tabindex="0" role="radio" aria-checked="false" id="optTop2">
-          <div class="card-icon-wrap" aria-hidden="true">🥈</div>
-          <h3 class="card-title">Top 2</h3>
-          <p class="card-subtitle">Runner-Up and Grand Champion Duel</p>
-          <div class="card-podium-preview" aria-hidden="true">
-            <div class="podium-bar silver" title="2nd Place"></div>
-            <div class="podium-bar gold" title="1st Place"></div>
+        <!-- SMOOTH RANGE SLIDER (1 to 50) -->
+        <div class="count-slider-container">
+          <input 
+            type="range" 
+            id="winnerCountSlider" 
+            class="custom-range-slider" 
+            min="1" 
+            max="50" 
+            value="3" 
+            aria-label="Winner Count Slider"
+          >
+          <div class="slider-ticks-row" aria-hidden="true">
+            <span>1</span>
+            <span>10</span>
+            <span>20</span>
+            <span>30</span>
+            <span>40</span>
+            <span>50 Teams</span>
           </div>
-          <span class="card-time-badge">⏱ ~26s Video</span>
         </div>
 
-        <!-- TOP 3 OPTION (Default / Recommended) -->
-        <div class="option-card selected" data-count="3" tabindex="0" role="radio" aria-checked="true" id="optTop3">
-          <span class="card-badge">Popular</span>
-          <div class="card-icon-wrap" aria-hidden="true">🥇</div>
-          <h3 class="card-title">Top 3</h3>
-          <p class="card-subtitle">Classic Bronze, Silver, & Gold Podium</p>
-          <div class="card-podium-preview" aria-hidden="true">
-            <div class="podium-bar silver" title="2nd Place"></div>
-            <div class="podium-bar gold" title="1st Place"></div>
-            <div class="podium-bar bronze" title="3rd Place"></div>
+        <!-- QUICK PRESETS CHIPS -->
+        <div class="presets-container">
+          <span class="presets-label">Quick Preset Options:</span>
+          <div class="presets-pills-row">
+            <button type="button" class="preset-pill" data-count="1">Top 1</button>
+            <button type="button" class="preset-pill" data-count="2">Top 2</button>
+            <button type="button" class="preset-pill active" data-count="3">Top 3 (Popular)</button>
+            <button type="button" class="preset-pill" data-count="5">Top 5</button>
+            <button type="button" class="preset-pill" data-count="10">Top 10</button>
+            <button type="button" class="preset-pill" data-count="15">Top 15</button>
+            <button type="button" class="preset-pill" data-count="20">Top 20</button>
+            <button type="button" class="preset-pill" data-count="50">Top 50 (Max)</button>
           </div>
-          <span class="card-time-badge">⏱ ~29s Video</span>
         </div>
 
-        <!-- TOP 5 OPTION -->
-        <div class="option-card" data-count="5" tabindex="0" role="radio" aria-checked="false" id="optTop5">
-          <div class="card-icon-wrap" aria-hidden="true">💎</div>
-          <h3 class="card-title">Top 5</h3>
-          <p class="card-subtitle">Full Hackathon Showcase (5th to 1st)</p>
-          <div class="card-podium-preview" aria-hidden="true">
-            <div class="podium-bar extra" title="5th Place"></div>
-            <div class="podium-bar extra" title="4th Place"></div>
-            <div class="podium-bar bronze" title="3rd Place"></div>
-            <div class="podium-bar silver" title="2nd Place"></div>
-            <div class="podium-bar gold" title="1st Place"></div>
+        <!-- DYNAMIC CEREMONY DURATION SUMMARY -->
+        <div>
+          <div id="durationSummaryBadge" class="duration-summary-pill">
+            <span>⏱ Estimated Ceremony: ~48s (3s Countdown + 10s Reveal per Team)</span>
           </div>
-          <span class="card-time-badge">⏱ ~31s Video</span>
         </div>
 
       </div>
@@ -146,7 +157,7 @@
       <div class="section-header">
         <span class="badge-tag">Step 2 of 3</span>
         <h2 id="step2Title" class="main-question">Enter Winning Team Names</h2>
-        <p class="section-desc">Provide the winning team names in order of their announcement. Each team will receive an exclusive animated reveal scene.</p>
+        <p class="section-desc">Provide the winning team names in order of their announcement. Each team will receive a 3s countdown followed by a 10s spotlight reveal.</p>
       </div>
 
       <div class="form-shell">
@@ -156,9 +167,28 @@
             <div class="selected-winner-badge">
               <span id="selectedWinnerCountBadge">🏆 Announcing: Top 3 Teams</span>
             </div>
-            <button type="button" id="btnAutofill" class="autofill-btn" title="Quick-fill sample hackathon teams">
-              <span>✨ Fill Sample Teams</span>
-            </button>
+            
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button type="button" id="btnToggleBulkPaste" class="btn-secondary" style="padding: 8px 16px; font-size: 13px;" title="Paste multiple team names at once">
+                <span>📋 Paste Names List</span>
+              </button>
+              <button type="button" id="btnAutofill" class="autofill-btn" title="Quick-fill sample hackathon teams">
+                <span>✨ Fill Sample Teams</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- BULK PASTE DRAWER -->
+          <div id="bulkPasteDrawer" class="bulk-paste-drawer">
+            <label for="bulkPasteInput" class="field-label" style="color: var(--cyan-accent); font-weight: 700;">
+              📋 Paste Team Names (One per line, from 1st to Nth or Nth to 1st):
+            </label>
+            <textarea id="bulkPasteInput" class="bulk-paste-textarea" placeholder="CyberTitans&#10;NeuralForge AI&#10;QuantumLeap&#10;Apex Innovators..."></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+              <button type="button" id="btnApplyBulkPaste" class="btn-primary" style="padding: 10px 20px; font-size: 14px;">
+                Apply to Inputs
+              </button>
+            </div>
           </div>
 
           <!-- EVENT DETAILS COLLAPSIBLE / CUSTOMIZATION -->

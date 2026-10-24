@@ -331,6 +331,34 @@ class SoundEngine {
 
     noise.start(t);
   }
+
+  // 3-Second Countdown Tick (3, 2, 1)
+  playCountdownTick(num = 3) {
+    if (this.isMuted || !this.ctx) return;
+    this.ensureContext();
+    const t = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    // Pitch increases on 3 -> 2 -> 1 for mounting tension
+    const baseFreq = num === 1 ? 880 : (num === 2 ? 659.25 : 523.25);
+    osc.type = num === 1 ? 'sawtooth' : 'sine';
+    osc.frequency.setValueAtTime(baseFreq, t);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, t + 0.18);
+
+    gain.gain.setValueAtTime(num === 1 ? 0.35 : 0.25, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(t);
+    osc.stop(t + 0.25);
+
+    // Sub thump on tick
+    this.playSnareTap(t, num === 1 ? 0.4 : 0.2, 180);
+  }
 }
 
 export const soundEngine = new SoundEngine();
