@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Top Winners Announcement — Cinematic Video Studio</title>
+  <meta name="description" content="Generate high-energy, cinematic 16:9 winner announcement videos for hackathons, esports, and competitions with dynamic typography, 3D trophies, spotlights, and confetti.">
+
+  <!-- Google Fonts for Hollywood / E-Sports Aesthetics -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Outfit:wght@400;500;600;700;800&family=Syne:wght@700;800;900&family=Montserrat:wght@800;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- APP HEADER -->
+    <header class="app-header">
+      <div class="brand-badge">
+        <span class="brand-icon" aria-hidden="true">🏆</span>
+        <div>
+          <h1 class="brand-title">ARENA CEREMONY</h1>
+          <p class="brand-sub">Top Winners Video Announcement Studio</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- AUDIO MUTE / UNMUTE TOGGLE -->
+        <button id="toggleAudioBtn" class="audio-btn" title="Toggle Sound FX & Fanfare">
+          <div class="audio-wave" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <span id="audioBtnText">Sound: ON</span>
+        </button>
+
+        <!-- THEME SELECTOR -->
+        <button id="themeToggleBtn" class="theme-btn" title="Switch Theme">
+          <span>🎨 Theme: Gold</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- STEP PROGRESS BREADCRUMBS -->
+    <nav class="stepper-container" aria-label="Creation Steps">
+      <div class="stepper-nav">
+        <div id="stepNav1" class="step-item active">
+          <span class="step-num">1</span>
+          <span>Select Top Teams</span>
+        </div>
+        <div class="step-divider" aria-hidden="true"></div>
+        <div id="stepNav2" class="step-item">
+          <span class="step-num">2</span>
+          <span>Enter Team Names</span>
+        </div>
+        <div class="step-divider" aria-hidden="true"></div>
+        <div id="stepNav3" class="step-item">
+          <span class="step-num">3</span>
+          <span>Winner Reveal Video</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ============================================================
+         STEP 1: SELECT NUMBER OF WINNING TEAMS
+         ============================================================ -->
+    <section id="step1Panel" class="wizard-panel active" aria-labelledby="step1Title">
+      <div class="section-header">
+        <span class="badge-tag">Step 1 of 3</span>
+        <h2 id="step1Title" class="main-question">How many top teams do you want to announce?</h2>
+        <p class="section-desc">Select the winner ceremony format for your competition. Team names will be requested in the next step.</p>
+      </div>
+
+      <!-- 4 Selectable Cards: Top 1, Top 2, Top 3, Top 5 -->
+      <div class="winner-options-grid" role="radiogroup" aria-label="Number of Top Teams">
+        
+        <!-- TOP 1 OPTION -->
+        <div class="option-card" data-count="1" tabindex="0" role="radio" aria-checked="false" id="optTop1">
+          <div class="card-icon-wrap" aria-hidden="true">👑</div>
+          <h3 class="card-title">Top 1</h3>
+          <p class="card-subtitle">Ultimate Grand Champion Solo Spotlight</p>
+          <div class="card-podium-preview" aria-hidden="true">
+            <div class="podium-bar gold" title="1st Place Champion"></div>
+          </div>
+          <span class="card-time-badge">⏱ ~26s Video</span>
+        </div>
+
+        <!-- TOP 2 OPTION -->
+        <div class="option-card" data-count="2" tabindex="0" role="radio" aria-checked="false" id="optTop2">
+          <div class="card-icon-wrap" aria-hidden="true">🥈</div>
+          <h3 class="card-title">Top 2</h3>
+          <p class="card-subtitle">Runner-Up and Grand Champion Duel</p>
+          <div class="card-podium-preview" aria-hidden="true">
+            <div class="podium-bar silver" title="2nd Place"></div>
+            <div class="podium-bar gold" title="1st Place"></div>
+          </div>
+          <span class="card-time-badge">⏱ ~26s Video</span>
+        </div>
+
+        <!-- TOP 3 OPTION (Default / Recommended) -->
+        <div class="option-card selected" data-count="3" tabindex="0" role="radio" aria-checked="true" id="optTop3">
+          <span class="card-badge">Popular</span>
+          <div class="card-icon-wrap" aria-hidden="true">🥇</div>
+          <h3 class="card-title">Top 3</h3>
+          <p class="card-subtitle">Classic Bronze, Silver, & Gold Podium</p>
+          <div class="card-podium-preview" aria-hidden="true">
+            <div class="podium-bar silver" title="2nd Place"></div>
+            <div class="podium-bar gold" title="1st Place"></div>
+            <div class="podium-bar bronze" title="3rd Place"></div>
+          </div>
+          <span class="card-time-badge">⏱ ~29s Video</span>
+        </div>
+
+        <!-- TOP 5 OPTION -->
+        <div class="option-card" data-count="5" tabindex="0" role="radio" aria-checked="false" id="optTop5">
+          <div class="card-icon-wrap" aria-hidden="true">💎</div>
+          <h3 class="card-title">Top 5</h3>
+          <p class="card-subtitle">Full Hackathon Showcase (5th to 1st)</p>
+          <div class="card-podium-preview" aria-hidden="true">
+            <div class="podium-bar extra" title="5th Place"></div>
+            <div class="podium-bar extra" title="4th Place"></div>
+            <div class="podium-bar bronze" title="3rd Place"></div>
+            <div class="podium-bar silver" title="2nd Place"></div>
+            <div class="podium-bar gold" title="1st Place"></div>
+          </div>
+          <span class="card-time-badge">⏱ ~31s Video</span>
+        </div>
+
+      </div>
+
+      <!-- STEP 1 ACTION BUTTON -->
+      <div class="step-actions">
+        <button id="btnProceedToStep2" class="btn-primary" type="button">
+          <span>Continue to Team Names</span>
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         STEP 2: ASK FOR TEAM NAMES (DYNAMIC FORM)
+         ============================================================ -->
+    <section id="step2Panel" class="wizard-panel" aria-labelledby="step2Title">
+      <div class="section-header">
+        <span class="badge-tag">Step 2 of 3</span>
+        <h2 id="step2Title" class="main-question">Enter Winning Team Names</h2>
+        <p class="section-desc">Provide the winning team names in order of their announcement. Each team will receive an exclusive animated reveal scene.</p>
+      </div>
+
+      <div class="form-shell">
+        <form id="teamNamesForm" novalidate>
+          
+          <div class="form-top-bar">
+            <div class="selected-winner-badge">
+              <span id="selectedWinnerCountBadge">🏆 Announcing: Top 3 Teams</span>
+            </div>
+            <button type="button" id="btnAutofill" class="autofill-btn" title="Quick-fill sample hackathon teams">
+              <span>✨ Fill Sample Teams</span>
+            </button>
+          </div>
+
+          <!-- EVENT DETAILS COLLAPSIBLE / CUSTOMIZATION -->
+          <div class="event-settings-box">
+            <span class="field-label" style="color: var(--gold-primary);">🏆 Event Branding & Title</span>
+            <div class="event-settings-grid">
+              <div>
+                <label for="eventTitleInput" class="field-label">Competition / Event Title</label>
+                <input type="text" id="eventTitleInput" class="text-input" value="GLOBAL INNOVATION HACKATHON 2026" maxlength="40">
+              </div>
+              <div>
+                <label for="eventSubtitleInput" class="field-label">Category / Subtitle</label>
+                <input type="text" id="eventSubtitleInput" class="text-input" value="GRAND FINALE AWARDS CEREMONY" maxlength="45">
+              </div>
+            </div>
+          </div>
+
+          <!-- DYNAMIC TEAM INPUTS CONTAINER (Generated strictly based on selected count) -->
+          <div id="dynamicTeamsContainer" class="teams-list-container">
+            <!-- Dynamically populated in JavaScript -->
+          </div>
+
+          <!-- FORM ACTIONS -->
+          <div class="step-actions" style="justify-content: space-between;">
+            <button type="button" id="btnBackToStep1" class="btn-secondary">
+              <span aria-hidden="true">←</span>
+              <span>Back to Selection</span>
+            </button>
+
+            <button type="submit" id="btnGenerateVideo" class="btn-primary">
+              <span>🎬 Generate Announcement Video</span>
+              <span aria-hidden="true">✨</span>
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         STEP 3: GENERATE & WATCH ANNOUNCEMENT VIDEO
+         ============================================================ -->
+    <section id="step3Panel" class="wizard-panel" aria-labelledby="step3Title">
+      <div class="section-header" style="margin-bottom: 24px;">
+        <span class="badge-tag">Step 3 of 3 // Ready</span>
+        <h2 id="step3Title" class="main-question">Official Winners Announcement</h2>
+        <p class="section-desc">16:9 Cinematic Video Reveal. 1st Place features the supreme grand champion explosion.</p>
+      </div>
+
+      <div class="video-studio-layout">
+
+        <!-- 16:9 CINEMA STAGE & CANVAS PLAYER -->
+        <div class="cinema-stage-frame">
+          <div class="video-canvas-container" id="cinemaPlayerContainer">
+            <canvas id="announcementCanvas" width="1920" height="1080"></canvas>
+
+            <!-- BIG PLAY OVERLAY -->
+            <div id="canvasPlayOverlay" class="canvas-play-overlay">
+              <button id="bigPlayBtn" class="big-play-btn" aria-label="Play Announcement Video">▶</button>
+              <span class="play-prompt-text">CLICK TO PLAY ANNOUNCEMENT</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- PLAYER CONTROLS PANEL -->
+        <div class="player-controls-panel">
+          
+          <!-- TIMELINE SCRUBBER & SCENE MARKERS -->
+          <div class="timeline-scrubber-wrap">
+            <div id="timelineMarkersTrack" class="timeline-markers-track">
+              <!-- Markers generated dynamically -->
+            </div>
+            <input type="range" id="videoScrubber" class="scrubber-slider" min="0" max="28" step="0.05" value="0" aria-label="Video Timeline">
+          </div>
+
+          <!-- CONTROLS ROW -->
+          <div class="controls-row">
+            <div class="controls-left">
+              <button id="btnPlayPause" class="ctrl-btn play-pause-btn" title="Play / Pause (Space)">
+                <span id="playPauseIcon">▶</span>
+              </button>
+              <button id="btnRestart" class="ctrl-btn" title="Restart Video (R)">
+                <span>↺</span>
+              </button>
+              <div class="time-display">
+                <span id="currentTimeDisplay" class="current-time">00:00</span>
+                <span>/</span>
+                <span id="totalTimeDisplay">00:28</span>
+              </div>
+            </div>
+
+            <div class="controls-right">
+              <button id="btnFullscreen" class="ctrl-btn" title="Toggle Cinema Fullscreen">
+                <span>⛶</span>
+              </button>
+
+              <button id="btnEditTeams" class="btn-secondary" style="padding: 10px 18px; font-size: 13px;" title="Edit team names">
+                <span>✏️ Edit Teams</span>
+              </button>
+
+              <button id="btnNewAnnouncement" class="btn-secondary" style="padding: 10px 18px; font-size: 13px;" title="Start over">
+                <span>🔄 Change Winners Count</span>
+              </button>
+
+              <button id="btnExportVideo" class="btn-export" title="Export full video to MP4 or WebM">
+                <span id="exportIcon">📥</span>
+                <span id="exportText">Export HD Video</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- RECORDING & EXPORT PROGRESS OVERLAY MODAL -->
+    <div id="recordingModal" class="recording-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="recording-card">
+        <div class="recording-spinner"></div>
+        <h3 style="font-family: var(--font-tech); color: var(--gold-primary); font-size: 22px; margin-bottom: 8px;">
+          RENDERING HD VIDEO...
+        </h3>
+        <p style="color: var(--text-muted); font-size: 14px;">
+          Recording full 1080p 60fps cinematic animation with synchronized sound fanfare.
+        </p>
+
+        <div class="recording-progress-bar-wrap">
+          <div id="recordingProgressFill" class="recording-progress-bar"></div>
+        </div>
+        <span id="recordingPercentText" style="font-family: var(--font-tech); font-size: 13px; color: var(--gold-primary);">0%</span>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <p>Cinematic Competition & Hackathon Winner Announcement Studio • 16:9 Broadcast Quality</p>
+    </footer>
+
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
