@@ -245,6 +245,55 @@
           <div class="video-canvas-container" id="cinemaPlayerContainer">
             <canvas id="announcementCanvas" width="1920" height="1080"></canvas>
 
+            <!-- PROMINENT ON-SCREEN SKIP BUTTON (Visible during reveal wait) -->
+            <button type="button" id="btnOnScreenSkip" class="on-screen-skip-btn" title="Skip 10s wait and jump to next reveal (S)">
+              <span class="skip-icon" aria-hidden="true">⏩</span>
+              <span class="skip-label">SKIP WAIT</span>
+              <kbd class="hud-kbd">S</kbd>
+            </button>
+
+            <!-- DYNAMIC 10-SECOND REVEAL TIMER & SKIP HUD OVERLAY -->
+            <div id="revealTimerHud" class="reveal-timer-hud" aria-label="10-Second Reveal Wait Timer and Skip">
+              <div class="hud-timer-badge">
+                <span class="hud-timer-pulse" aria-hidden="true"></span>
+                <span class="hud-timer-icon" aria-hidden="true">⏱️</span>
+                <div class="hud-timer-info">
+                  <span class="hud-timer-title">WAIT COUNTDOWN</span>
+                  <span id="hudCountdownSec" class="hud-timer-value">10.0s</span>
+                </div>
+              </div>
+
+              <!-- Interactive 10s Timer Slider (Modern Web Guidance Native Range Slider) -->
+              <div class="hud-slider-group">
+                <label for="revealTimerSlider" class="visually-hidden">10s Reveal Wait Slider</label>
+                <div class="hud-slider-track-wrap">
+                  <input 
+                    type="range" 
+                    id="revealTimerSlider" 
+                    class="reveal-timer-slider" 
+                    min="0" 
+                    max="10" 
+                    step="0.05" 
+                    value="0" 
+                    aria-label="10s Reveal Wait Progress Slider"
+                  >
+                  <div id="hudSliderFill" class="hud-slider-fill"></div>
+                </div>
+                <div class="hud-slider-ticks" aria-hidden="true">
+                  <span>0s</span>
+                  <span>5s</span>
+                  <span>10s Wait</span>
+                </div>
+              </div>
+
+              <!-- Interactive Skip Wait Button -->
+              <button type="button" id="btnSkipWait" class="hud-skip-btn" title="Skip 10s wait and jump to next reveal (S)">
+                <span class="hud-skip-icon" aria-hidden="true">⏩</span>
+                <span class="hud-skip-text">Skip Wait</span>
+                <kbd class="hud-kbd">S</kbd>
+              </button>
+            </div>
+
             <!-- BIG PLAY OVERLAY -->
             <div id="canvasPlayOverlay" class="canvas-play-overlay">
               <button id="bigPlayBtn" class="big-play-btn" aria-label="Play Announcement Video">▶</button>
@@ -272,6 +321,9 @@
               </button>
               <button id="btnRestart" class="ctrl-btn" title="Restart Video (R)">
                 <span>↺</span>
+              </button>
+              <button id="btnSkipScene" class="ctrl-btn skip-scene-btn" title="Skip 10s Wait to Next Scene (S)">
+                <span aria-hidden="true">⏩</span>
               </button>
               <div class="time-display">
                 <span id="currentTimeDisplay" class="current-time">00:00</span>

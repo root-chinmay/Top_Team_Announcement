@@ -47,6 +47,11 @@ export class VideoEngine {
     this.mediaRecorder = null;
     this.recordedChunks = [];
     this.isRecording = false;
+
+    // Interactive on-canvas skip button
+    this.skipBtnRect = null;
+    this.isMouseOverSkipBtn = false;
+    this.setupCanvasInteractions();
   }
 
   setData({ eventTitle, eventSubtitle, winnerCount, teams, theme = 'gold' }) {
@@ -170,6 +175,7 @@ export class VideoEngine {
 
   pause() {
     this.isPlaying = false;
+    soundEngine.cancelSpeech();
     if (this.rafId) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
@@ -186,6 +192,7 @@ export class VideoEngine {
   }
 
   seek(timeInSeconds) {
+    soundEngine.cancelSpeech();
     this.currentTime = Math.max(0, Math.min(this.duration, timeInSeconds));
 
     // Reset fired events that are after currentTime
@@ -197,7 +204,91 @@ export class VideoEngine {
     }
 
     this.renderFrame(this.currentTime);
-    if (this.onTimeUpdate) this.onTimeUpdate(this.currentTime, this.duration);
+    const activeScene = this.getActiveScene();
+    if (this.onTimeUpdate) this.onTimeUpdate(this.currentTime, this.duration, activeScene);
+  }
+
+  getActiveScene() {
+    if (!this.sceneSchedule || this.sceneSchedule.length === 0) return null;
+    return this.sceneSchedule.find(s => this.currentTime >= s.start && this.currentTime < s.end) 
+      || this.sceneSchedule[this.sceneSchedule.length - 1];
+  }
+
+  // Skip the remaining wait of the currently active scene (advances directly to next scene)
+  skipCurrentWait() {
+    const activeScene = this.getActiveScene();
+    if (!activeScene) return;
+
+    soundEngine.cancelSpeech();
+    soundEngine.playSkipWhoosh();
+    // Fast-forward to the very end of the current scene
+    this.seek(activeScene.end);
+    if (this.isPlaying) {
+      this.play();
+    }
+  }
+
+  // Skip to next scene directly
+  skipToNextScene() {
+    const activeIdx = this.sceneSchedule.findIndex(s => this.currentTime >= s.start && this.currentTime < s.end);
+    if (activeIdx >= 0 && activeIdx < this.sceneSchedule.length - 1) {
+      soundEngine.cancelSpeech();
+      soundEngine.playSkipWhoosh();
+      const nextScene = this.sceneSchedule[activeIdx + 1];
+      this.seek(nextScene.start);
+      if (this.isPlaying) {
+        this.play();
+      }
+    }
+  }
+
+  setupCanvasInteractions() {
+    if (!this.canvas) return;
+
+    const getCanvasPos = (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const scaleX = this.width / rect.width;
+      const scaleY = this.height / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    };
+
+    this.canvas.addEventListener('mousemove', (e) => {
+      const pos = getCanvasPos(e);
+      const activeScene = this.getActiveScene();
+      const isWaitScene = activeScene && (activeScene.type === 'rank' || activeScene.type === 'champion');
+
+      if (isWaitScene && this.skipBtnRect) {
+        const inBtn = pos.x >= this.skipBtnRect.x && pos.x <= this.skipBtnRect.x + this.skipBtnRect.w &&
+                      pos.y >= this.skipBtnRect.y && pos.y <= this.skipBtnRect.y + this.skipBtnRect.h;
+        if (this.isMouseOverSkipBtn !== inBtn) {
+          this.isMouseOverSkipBtn = inBtn;
+          this.canvas.style.cursor = inBtn ? 'pointer' : 'default';
+        }
+      } else {
+        if (this.isMouseOverSkipBtn) {
+          this.isMouseOverSkipBtn = false;
+          this.canvas.style.cursor = 'default';
+        }
+      }
+    });
+
+    this.canvas.addEventListener('click', (e) => {
+      const pos = getCanvasPos(e);
+      const activeScene = this.getActiveScene();
+      const isWaitScene = activeScene && (activeScene.type === 'rank' || activeScene.type === 'champion');
+
+      if (isWaitScene && this.skipBtnRect) {
+        const inBtn = pos.x >= this.skipBtnRect.x && pos.x <= this.skipBtnRect.x + this.skipBtnRect.w &&
+                      pos.y >= this.skipBtnRect.y && pos.y <= this.skipBtnRect.y + this.skipBtnRect.h;
+        if (inBtn) {
+          e.stopPropagation();
+          this.skipCurrentWait();
+        }
+      }
+    });
   }
 
   loop(timestamp) {
@@ -212,12 +303,14 @@ export class VideoEngine {
       this.currentTime = this.duration;
       this.renderFrame(this.currentTime);
       this.pause();
-      if (this.onTimeUpdate) this.onTimeUpdate(this.currentTime, this.duration);
+      const activeScene = this.getActiveScene();
+      if (this.onTimeUpdate) this.onTimeUpdate(this.currentTime, this.duration, activeScene);
       return;
     }
 
     this.renderFrame(this.currentTime);
-    if (this.onTimeUpdate) this.onTimeUpdate(this.currentTime, this.duration);
+    const activeScene = this.getActiveScene();
+    if (this.onTimeUpdate) this.onTimeUpdate(this.currentTime, this.duration, activeScene);
 
     this.rafId = requestAnimationFrame((ts) => this.loop(ts));
   }
@@ -262,26 +355,12 @@ export class VideoEngine {
           soundEngine.playBoom(1.0);
           soundEngine.playWhoosh(1.4);
           this.particles.addShockwave(this.width / 2, this.height / 2, '#ffd700', 900);
-        } else if (scene.type === 'rank') {
-          soundEngine.playRankRevealChord(scene.rank);
-          this.shakeAmount = 14;
-          this.particles.addShockwave(this.width / 2, this.height / 2, this.getRankColor(scene.rank).primary, 850);
-          this.particles.burstFireworks(this.width / 2, this.height / 2 - 40, 90, [
-            this.getRankColor(scene.rank).primary,
-            this.getRankColor(scene.rank).secondary,
-            '#ffffff'
-          ]);
-          this.particles.addConfetti(60, scene.rank === 1);
-        } else if (scene.type === 'champion') {
-          soundEngine.playChampionFanfare();
-          this.shakeAmount = 28; // Massive screen shake
-          this.particles.addShockwave(this.width / 2, this.height / 2, '#ffd700', 1200);
-          this.particles.burstFireworks(this.width / 2, this.height / 2 - 60, 220, [
-            '#ffd700', '#fff59d', '#ffab00', '#ffffff'
-          ]);
-          this.particles.burstFireworks(this.width * 0.25, this.height * 0.35, 120, ['#ffd700', '#ff6d00']);
-          this.particles.burstFireworks(this.width * 0.75, this.height * 0.35, 120, ['#ffd700', '#00e5ff']);
-          this.particles.addConfetti(260, true);
+        } else if (scene.type === 'rank' || scene.type === 'champion') {
+          // Initial suspense entrance impact
+          soundEngine.playBoom(scene.type === 'champion' ? 1.1 : 0.85);
+          soundEngine.playWhoosh(0.9);
+          this.shakeAmount = scene.type === 'champion' ? 14 : 9;
+          this.particles.addShockwave(this.width / 2, this.height / 2, this.getRankColor(scene.rank).primary, 650);
         } else if (scene.type === 'podium') {
           soundEngine.playBoom(1.1);
           soundEngine.playSparkle();
@@ -290,10 +369,66 @@ export class VideoEngine {
         }
       }
 
-      // Continuous confetti for champion & podium scenes
-      if ((scene.type === 'champion' || scene.type === 'podium') && t >= scene.start && t <= scene.end) {
-        if (Math.random() < 0.3) {
-          this.particles.spawnCelebrationShower(3, scene.type === 'champion');
+      // Alphabet-by-alphabet announcement sound & speech trigger + climax celebration
+      if ((scene.type === 'rank' || scene.type === 'champion') && scene.team) {
+        const plan = this.getTeamRevealPlan(scene.team);
+
+        // Individual alphabet announce (musical chime + voice pronunciation)
+        const order = plan.letterOrder || plan.randomOrder || plan.validIndices;
+        for (let k = 0; k < order.length; k++) {
+          const charIdx = order[k];
+          const char = plan.chars[charIdx] || '';
+          const charUnlockTime = scene.start + plan.unlockTimes[charIdx];
+          const charKey = `char_${scene.type}_${scene.rank}_${k}@${charUnlockTime.toFixed(2)}`;
+          if (t >= charUnlockTime && !this.firedEvents.has(charKey)) {
+            this.firedEvents.add(charKey);
+            soundEngine.playLetterAnnounce(char, k + 1, plan.validIndices.length);
+            this.shakeAmount = Math.max(this.shakeAmount, 3.5);
+          }
+        }
+
+        // Climax celebration when all characters are 100% unlocked!
+        const climaxTime = scene.start + plan.completeTime;
+        const climaxKey = `climax_${scene.type}_${scene.rank}@${climaxTime.toFixed(2)}`;
+        if (t >= climaxTime && !this.firedEvents.has(climaxKey)) {
+          this.firedEvents.add(climaxKey);
+          soundEngine.announceTeamName(scene.team.name, scene.rank);
+
+          if (scene.type === 'rank') {
+            soundEngine.playRankRevealChord(scene.rank);
+            this.shakeAmount = 16;
+            this.particles.addShockwave(this.width / 2, this.height / 2, this.getRankColor(scene.rank).primary, 850);
+            this.particles.burstFireworks(this.width / 2, this.height / 2 - 40, 90, [
+              this.getRankColor(scene.rank).primary,
+              this.getRankColor(scene.rank).secondary,
+              '#ffffff'
+            ]);
+            this.particles.addConfetti(70, false);
+          } else if (scene.type === 'champion') {
+            soundEngine.playChampionFanfare();
+            this.shakeAmount = 30; // Massive celebration screen shake
+            this.particles.addShockwave(this.width / 2, this.height / 2, '#ffd700', 1200);
+            this.particles.burstFireworks(this.width / 2, this.height / 2 - 60, 220, [
+              '#ffd700', '#fff59d', '#ffab00', '#ffffff'
+            ]);
+            this.particles.burstFireworks(this.width * 0.25, this.height * 0.35, 120, ['#ffd700', '#ff6d00']);
+            this.particles.burstFireworks(this.width * 0.75, this.height * 0.35, 120, ['#ffd700', '#00e5ff']);
+            this.particles.addConfetti(260, true);
+          }
+        }
+
+        // Continuous confetti celebration shower after complete reveal
+        if (t >= climaxTime && t <= scene.end) {
+          if (Math.random() < (scene.type === 'champion' ? 0.32 : 0.15)) {
+            this.particles.spawnCelebrationShower(2, scene.type === 'champion');
+          }
+        }
+      }
+
+      // Continuous confetti for podium scene
+      if (scene.type === 'podium' && t >= scene.start && t <= scene.end) {
+        if (Math.random() < 0.25) {
+          this.particles.spawnCelebrationShower(2, false);
         }
       }
     }
@@ -376,6 +511,10 @@ export class VideoEngine {
 
     if (activeScene) {
       const sceneProgress = (time - activeScene.start) / (activeScene.end - activeScene.start);
+
+      if (activeScene.type !== 'rank' && activeScene.type !== 'champion') {
+        this.skipBtnRect = null;
+      }
 
       switch (activeScene.type) {
         case 'intro':
@@ -573,6 +712,446 @@ export class VideoEngine {
     ctx.restore();
   }
 
+  // Announce the team name alphabet by alphabet in natural sequential order (one by one)
+  getTeamRevealPlan(team) {
+    if (team._revealPlan && team._revealPlan.name === team.name) {
+      return team._revealPlan;
+    }
+
+    const name = (team.name || "TEAM").trim();
+    const chars = name.split('');
+    const validIndices = [];
+    for (let i = 0; i < chars.length; i++) {
+      if (chars[i] !== ' ') {
+        validIndices.push(i);
+      }
+    }
+
+    // Natural sequential order: 0, 1, 2, 3... (one alphabet by one alphabet)
+    const letterOrder = [...validIndices];
+
+    // Calculate reveal timestamps for each character
+    // Alphabet announcement begins at 0.45s and reveals letter-by-letter smoothly
+    const unlockTimes = {};
+    const total = letterOrder.length;
+    const windowStart = 0.45;
+    const windowDuration = Math.min(3.4, Math.max(1.6, total * 0.38));
+
+    for (let k = 0; k < total; k++) {
+      const charIdx = letterOrder[k];
+      const unlockTime = total <= 1 ? windowStart : windowStart + (k / (total - 1)) * windowDuration;
+      unlockTimes[charIdx] = unlockTime;
+    }
+
+    const plan = {
+      name: name,
+      chars: chars,
+      validIndices: validIndices,
+      letterOrder: letterOrder,
+      randomOrder: letterOrder,
+      unlockTimes: unlockTimes,
+      completeTime: windowStart + windowDuration + 0.1
+    };
+
+    team._revealPlan = plan;
+    return plan;
+  }
+
+  // SUSPENSE REVEAL: Reveals characters of the team name one by one in random positions!
+  renderSuspenseTeamName(ctx, team, rank, isChampion, sceneTime, sceneDuration, time) {
+    const plan = this.getTeamRevealPlan(team);
+    const chars = plan.chars;
+    const rankInfo = this.getRankColor(rank);
+
+    // Dynamic responsive font sizing so long team names stay perfectly framed
+    let fontSize = isChampion ? 96 : 82;
+    if (chars.length > 25) fontSize = isChampion ? 64 : 54;
+    else if (chars.length > 18) fontSize = isChampion ? 74 : 64;
+    else if (chars.length > 13) fontSize = isChampion ? 84 : 72;
+
+    ctx.save();
+    ctx.font = `900 ${fontSize}px "Syne", "Montserrat", sans-serif`;
+    ctx.textBaseline = 'middle';
+
+    const letterSpacing = isChampion ? 6 : 5;
+    const charWidths = chars.map(c => {
+      if (c === ' ') return fontSize * 0.36;
+      return Math.max(fontSize * 0.44, ctx.measureText(c).width);
+    });
+
+    const totalWidth = charWidths.reduce((a, b) => a + b, 0) + (chars.length - 1) * letterSpacing;
+    const startX = -totalWidth / 2;
+    const yBaseline = isChampion ? 85 : 50;
+
+    // Check which characters are unlocked at current sceneTime
+    let numUnlocked = 0;
+    const isUnlocked = [];
+    const isRecentlyUnlocked = [];
+
+    for (let i = 0; i < chars.length; i++) {
+      if (chars[i] === ' ') {
+        isUnlocked.push(true);
+        isRecentlyUnlocked.push(false);
+      } else {
+        const uTime = plan.unlockTimes[i] !== undefined ? plan.unlockTimes[i] : 0;
+        const unlocked = sceneTime >= uTime;
+        isUnlocked.push(unlocked);
+        if (unlocked) {
+          numUnlocked++;
+          isRecentlyUnlocked.push(sceneTime - uTime < 0.35);
+        } else {
+          isRecentlyUnlocked.push(false);
+        }
+      }
+    }
+
+    const isAllRevealed = numUnlocked === plan.validIndices.length;
+
+    // 1. Announcing Status Banner above Name
+    ctx.textAlign = 'center';
+    if (!isAllRevealed) {
+      ctx.font = '800 20px "Orbitron", sans-serif';
+      ctx.letterSpacing = '5px';
+      ctx.fillStyle = isChampion ? 'rgba(255, 215, 0, 0.95)' : 'rgba(0, 229, 255, 0.95)';
+      ctx.shadowColor = isChampion ? '#ffd700' : '#00e5ff';
+      ctx.shadowBlur = 15;
+      ctx.fillText(`★ ANNOUNCING TEAM • [LETTER ${numUnlocked}/${plan.validIndices.length}] ★`, 0, yBaseline - (fontSize * 0.72 + 14));
+    } else {
+      ctx.font = '800 18px "Orbitron", sans-serif';
+      ctx.letterSpacing = '4px';
+      ctx.fillStyle = isChampion ? '#ffd700' : rankInfo.primary;
+      ctx.shadowColor = isChampion ? '#ffd700' : rankInfo.glow;
+      ctx.shadowBlur = 12;
+      ctx.fillText(`★ ${isChampion ? 'GRAND CHAMPION' : this.getRankOrdinal(rank).toUpperCase() + ' PLACE'} CONFIRMED ★`, 0, yBaseline - (fontSize * 0.72 + 14));
+    }
+
+    ctx.font = `900 ${fontSize}px "Syne", "Montserrat", sans-serif`;
+
+    // 2. Render Each Character Slot
+    let currentX = startX;
+
+    for (let i = 0; i < chars.length; i++) {
+      const c = chars[i];
+      const w = charWidths[i];
+      const charCenterX = currentX + w / 2;
+
+      if (c === ' ') {
+        currentX += w + letterSpacing;
+        continue;
+      }
+
+      if (isUnlocked[i]) {
+        // UNLOCKED CHARACTER: Render in bold metallic chrome
+        ctx.save();
+        ctx.textAlign = 'center';
+
+        const fresh = isRecentlyUnlocked[i];
+        if (fresh) {
+          const pop = 1.0 + Math.max(0, 0.22 - (sceneTime - plan.unlockTimes[i]) * 0.6);
+          ctx.translate(charCenterX, yBaseline);
+          ctx.scale(pop, pop);
+          ctx.translate(-charCenterX, -yBaseline);
+
+          // Impact shockwave ring
+          ctx.strokeStyle = isChampion ? '#fff59d' : '#ffffff';
+          ctx.lineWidth = 3;
+          ctx.shadowColor = isChampion ? '#ffd700' : '#00e5ff';
+          ctx.shadowBlur = 25;
+          ctx.beginPath();
+          ctx.arc(charCenterX, yBaseline, w * 0.65, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        if (isChampion) {
+          for (let depth = 6; depth >= 1; depth--) {
+            ctx.fillStyle = depth > 3 ? '#3e2723' : '#b78103';
+            ctx.fillText(c, charCenterX + depth, yBaseline + depth);
+          }
+          const goldGrad = ctx.createLinearGradient(charCenterX - w / 2, yBaseline - 40, charCenterX + w / 2, yBaseline + 40);
+          goldGrad.addColorStop(0, '#ffffff');
+          goldGrad.addColorStop(0.2, '#fff176');
+          goldGrad.addColorStop(0.5, '#ffd700');
+          goldGrad.addColorStop(0.8, '#ff8f00');
+          ctx.fillStyle = goldGrad;
+          ctx.shadowColor = 'rgba(255, 215, 0, 0.85)';
+          ctx.shadowBlur = fresh ? 45 : 30;
+          ctx.fillText(c, charCenterX, yBaseline);
+        } else {
+          ctx.fillStyle = '#000000';
+          ctx.fillText(c, charCenterX + 4, yBaseline + 4);
+          ctx.fillStyle = rankInfo.secondary;
+          ctx.fillText(c, charCenterX + 2, yBaseline + 2);
+
+          const nameGrad = ctx.createLinearGradient(charCenterX - w / 2, yBaseline - 35, charCenterX + w / 2, yBaseline + 35);
+          nameGrad.addColorStop(0, rankInfo.light);
+          nameGrad.addColorStop(0.5, rankInfo.primary);
+          nameGrad.addColorStop(1, rankInfo.secondary);
+          ctx.fillStyle = nameGrad;
+          ctx.shadowColor = rankInfo.glow;
+          ctx.shadowBlur = fresh ? 35 : 20;
+          ctx.fillText(c, charCenterX, yBaseline);
+        }
+
+        ctx.restore();
+      } else {
+        // UNREVEALED ALPHABET SLOT (waiting to be announced):
+        ctx.save();
+        ctx.textAlign = 'center';
+
+        // Glowing Underline Slot Bar
+        const slotColor = isChampion ? 'rgba(255, 215, 0, 0.45)' : 'rgba(0, 229, 255, 0.45)';
+        ctx.strokeStyle = slotColor;
+        ctx.lineWidth = 3.5;
+        ctx.shadowColor = slotColor;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(charCenterX - w * 0.38, yBaseline + fontSize * 0.44);
+        ctx.lineTo(charCenterX + w * 0.38, yBaseline + fontSize * 0.44);
+        ctx.stroke();
+
+        // Subtle waiting slot indicator
+        ctx.font = `700 ${fontSize * 0.65}px "Orbitron", monospace`;
+        ctx.fillStyle = isChampion ? 'rgba(255, 215, 0, 0.25)' : 'rgba(0, 229, 255, 0.25)';
+        ctx.fillText('_', charCenterX, yBaseline);
+
+        ctx.restore();
+      }
+
+      currentX += w + letterSpacing;
+    }
+
+    ctx.restore();
+  }
+
+  // 10-SECOND WAIT TIMER SLIDER HUD OVERLAY ON CANVAS
+  renderRevealTimerHUD(sceneTime, sceneDuration = 10.0, rank = 1, isChampion = false, time = 0) {
+    const ctx = this.ctx;
+    ctx.save();
+    // Identity transform to guarantee exact screen placement independent of camera shake
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const cx = this.width / 2; // 960
+    const cy = 1005; // Placed inside 16:9 bottom frame
+    const remaining = Math.max(0, sceneDuration - sceneTime);
+    const progress = Math.min(1.0, Math.max(0, sceneTime / sceneDuration));
+
+    const rankInfo = this.getRankColor(rank);
+    const accentColor = isChampion ? '#ffd700' : rankInfo.primary;
+
+    // Outer HUD Pill Container
+    const pillW = 780;
+    const pillH = 50;
+    const pillX = cx - pillW / 2;
+    const pillY = cy - pillH / 2;
+
+    // Glowing Background Capsule
+    const bgGrad = ctx.createLinearGradient(pillX, pillY, pillX + pillW, pillY);
+    bgGrad.addColorStop(0, 'rgba(8, 12, 22, 0.94)');
+    bgGrad.addColorStop(0.5, 'rgba(15, 20, 36, 0.97)');
+    bgGrad.addColorStop(1, 'rgba(8, 12, 22, 0.94)');
+
+    ctx.fillStyle = bgGrad;
+    ctx.strokeStyle = isChampion ? 'rgba(255, 215, 0, 0.45)' : 'rgba(0, 229, 255, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 16;
+
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillW, pillH, 25);
+    ctx.fill();
+    ctx.stroke();
+
+    // 1. Left: Timer Icon & Countdown Seconds
+    ctx.shadowBlur = 0;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    ctx.font = '20px "Segoe UI Emoji", sans-serif';
+    ctx.fillText('⏱️', pillX + 20, cy);
+
+    ctx.font = '700 12px "Orbitron", sans-serif';
+    ctx.letterSpacing = '2px';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.fillText('WAIT TIMER', pillX + 50, cy - 8);
+
+    ctx.font = '900 18px "Orbitron", sans-serif';
+    ctx.letterSpacing = '1px';
+    ctx.fillStyle = accentColor;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 10;
+    ctx.fillText(`${remaining.toFixed(1)}s`, pillX + 50, cy + 12);
+
+    // 2. Center: Visual Timer Slider Track & Animated Fill
+    ctx.shadowBlur = 0;
+    const trackX = pillX + 195;
+    const trackW = 360;
+    const trackH = 10;
+    const trackY = cy - trackH / 2;
+
+    // Background unfilled rail
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.beginPath();
+    ctx.roundRect(trackX, trackY, trackW, trackH, 5);
+    ctx.fill();
+
+    // Filled progress rail
+    const fillW = Math.max(10, trackW * progress);
+    const fillGrad = ctx.createLinearGradient(trackX, 0, trackX + trackW, 0);
+    fillGrad.addColorStop(0, '#00e5ff');
+    fillGrad.addColorStop(1, accentColor);
+
+    ctx.fillStyle = fillGrad;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.roundRect(trackX, trackY, fillW, trackH, 5);
+    ctx.fill();
+
+    // Glowing Slider Knob / Thumb
+    const thumbX = trackX + fillW;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(thumbX, cy, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.arc(thumbX, cy, 9, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 3. Right: Skip Wait Button Cue
+    ctx.textAlign = 'right';
+    const skipPulse = 0.85 + Math.sin(time * 6) * 0.15;
+    ctx.font = '800 13px "Orbitron", sans-serif';
+    ctx.letterSpacing = '1.5px';
+    ctx.fillStyle = `rgba(255, 255, 255, ${skipPulse})`;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 12;
+    ctx.fillText('⏩ SKIP WAIT (S)', pillX + pillW - 20, cy);
+
+    ctx.restore();
+  }
+
+  // Dynamic timer-based line that decreases based on the waiting time, plus the on-screen interactive skip button
+  renderTimerLineAndSkipBtn(ctx, rankInfo, sceneTime, sceneDuration = 10.0, lineY = 160, maxHalfW = 270, isChampion = false, time = 0, scale = 1.0, screenCx = 960, screenCy = 540) {
+    const remaining = Math.max(0, sceneDuration - sceneTime);
+    const ratio = Math.min(1.0, Math.max(0, remaining / sceneDuration));
+    const accentColor = isChampion ? '#ffd700' : rankInfo.primary;
+
+    ctx.save();
+
+    // 1. Background Dim Rail Track (showing full waiting line length)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-maxHalfW, lineY);
+    ctx.lineTo(maxHalfW, lineY);
+    ctx.stroke();
+
+    // Track end caps / brackets
+    ctx.strokeStyle = isChampion ? 'rgba(255, 215, 0, 0.45)' : 'rgba(255, 255, 255, 0.35)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(-maxHalfW, lineY - 8); ctx.lineTo(-maxHalfW, lineY + 8);
+    ctx.moveTo(maxHalfW, lineY - 8); ctx.lineTo(maxHalfW, lineY + 8);
+    ctx.stroke();
+
+    // 2. Active Decreasing Timer Line (Shrinks based on waiting time remaining)
+    const trackW = maxHalfW * 2;
+    const currentW = trackW * ratio;
+    const endX = -maxHalfW + currentW;
+
+    if (currentW > 1) {
+      const lineGrad = ctx.createLinearGradient(-maxHalfW, 0, Math.max(-maxHalfW + 10, endX), 0);
+      lineGrad.addColorStop(0, '#00e5ff');
+      lineGrad.addColorStop(0.4, isChampion ? '#fff59d' : rankInfo.light);
+      lineGrad.addColorStop(1, accentColor);
+
+      ctx.strokeStyle = lineGrad;
+      ctx.lineWidth = 5.5;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = accentColor;
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.moveTo(-maxHalfW, lineY);
+      ctx.lineTo(endX, lineY);
+      ctx.stroke();
+
+      // Glowing runner node at the decreasing tip
+      const pulse = 6 + Math.sin(time * 8) * 1.5;
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = accentColor;
+      ctx.shadowBlur = 22;
+      ctx.beginPath();
+      ctx.arc(endX, lineY, pulse, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(endX, lineY, pulse + 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 3. Digital Countdown Readout below line
+    ctx.textAlign = 'center';
+    ctx.font = '800 16px "Orbitron", sans-serif';
+    ctx.letterSpacing = '3px';
+    ctx.fillStyle = isChampion ? '#fff59d' : rankInfo.primary;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 12;
+    const waitText = remaining > 0.05 ? `⏱️ REVEAL WAIT: ${remaining.toFixed(1)}s` : `⚡ ADVANCING TO NEXT REVEAL ⚡`;
+    ctx.fillText(waitText, 0, lineY + 32);
+
+    // 4. On-Screen Interactive SKIP Button on this screen
+    const btnW = 210;
+    const btnH = 44;
+    const btnX = -btnW / 2;
+    const btnY = lineY + 54;
+
+    // Track button bounding box in canvas coordinates for click and hover
+    this.skipBtnRect = {
+      x: screenCx + btnX * scale,
+      y: screenCy + btnY * scale,
+      w: btnW * scale,
+      h: btnH * scale
+    };
+
+    const isHovered = this.isMouseOverSkipBtn;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 22);
+
+    const btnBg = ctx.createLinearGradient(btnX, btnY, btnX + btnW, btnY + btnH);
+    if (isHovered) {
+      btnBg.addColorStop(0, 'rgba(255, 215, 0, 0.45)');
+      btnBg.addColorStop(1, 'rgba(255, 145, 0, 0.55)');
+    } else {
+      btnBg.addColorStop(0, 'rgba(10, 16, 28, 0.88)');
+      btnBg.addColorStop(1, 'rgba(18, 26, 46, 0.92)');
+    }
+    ctx.fillStyle = btnBg;
+    ctx.fill();
+
+    ctx.strokeStyle = isHovered ? '#ffffff' : accentColor;
+    ctx.lineWidth = isHovered ? 2.5 : 1.8;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = isHovered ? 24 : 14;
+    ctx.stroke();
+
+    // Button label: ⏩ SKIP WAIT
+    ctx.font = '800 13px "Orbitron", sans-serif';
+    ctx.letterSpacing = '2px';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 8;
+    ctx.fillText('⏩ SKIP WAIT', 0, btnY + btnH / 2);
+
+    ctx.restore();
+  }
+
   // Scene for 5th, 4th, 3rd, 2nd Place Reveals
   renderRankScene(team, rank, progress, time) {
     const ctx = this.ctx;
@@ -600,7 +1179,8 @@ export class VideoEngine {
 
     // Dynamic Entrance Scale & Slide
     const scale = 0.85 + animProgress * 0.15;
-    ctx.translate(cx, cy + (1 - animProgress) * 50);
+    const originY = cy + (1 - animProgress) * 50;
+    ctx.translate(cx, originY);
     ctx.scale(scale, scale);
 
     // 1. Render Medal / Trophy Visual
@@ -615,26 +1195,9 @@ export class VideoEngine {
     ctx.shadowBlur = 25;
     ctx.fillText(`${this.getRankOrdinal(rank)} PLACE`, 0, -40);
 
-    // 3. TEAM NAME — Large, Centered, and Crystal Clear (Displayed for 10s)
-    ctx.font = '900 82px "Syne", "Montserrat", sans-serif';
-    ctx.letterSpacing = '2px';
-
-    // 3D Shadow extrusion
-    ctx.fillStyle = '#000000';
-    ctx.fillText(team.name, 5, 55);
-    ctx.fillStyle = rankInfo.secondary;
-    ctx.fillText(team.name, 2, 52);
-
-    // Front gradient
-    const nameGrad = ctx.createLinearGradient(-350, 0, 350, 50);
-    nameGrad.addColorStop(0, rankInfo.light);
-    nameGrad.addColorStop(0.5, rankInfo.primary);
-    nameGrad.addColorStop(1, rankInfo.secondary);
-
-    ctx.fillStyle = nameGrad;
-    ctx.shadowColor = rankInfo.glow;
-    ctx.shadowBlur = 40;
-    ctx.fillText(team.name, 0, 50);
+    // 3. SUSPENSE CHARACTER-BY-CHARACTER SEQUENTIAL TEAM NAME REVEAL
+    const sceneTime = progress * 10.0;
+    this.renderSuspenseTeamName(ctx, team, rank, false, sceneTime, 10.0, time);
 
     // 4. Team Project / Tagline (if present)
     if (team.tagline) {
@@ -646,16 +1209,14 @@ export class VideoEngine {
       ctx.fillText(team.tagline, 0, 115);
     }
 
-    // 5. Decorative Rank Framing Lines
-    ctx.strokeStyle = rankInfo.primary;
-    ctx.lineWidth = 2.5;
-    ctx.shadowBlur = 15;
-    ctx.beginPath();
-    ctx.moveTo(-240, 160);
-    ctx.lineTo(240, 160);
-    ctx.stroke();
+    // 5. Dynamic Decreasing Wait Timer Line & On-Screen Skip Button
+    const lineY = team.tagline ? 165 : 145;
+    this.renderTimerLineAndSkipBtn(ctx, rankInfo, sceneTime, 10.0, lineY, 270, false, time, scale, cx, originY);
 
     ctx.restore();
+
+    // 6. 10-SECOND WAIT TIMER SLIDER HUD OVERLAY ON CANVAS
+    this.renderRevealTimerHUD(sceneTime, 10.0, rank, false, time);
   }
 
   // 3-SECOND VISUAL COUNTDOWN SHOWN ON SCREEN BEFORE REVEALING EACH TEAM
@@ -831,28 +1392,9 @@ export class VideoEngine {
     ctx.shadowBlur = 15;
     ctx.fillText("1ST PLACE WINNER", 0, -5);
 
-    // 3. TEAM NAME — Massive, Radiant, Chrome Gold
-    ctx.font = '900 100px "Syne", "Montserrat", sans-serif';
-    ctx.letterSpacing = '3px';
-
-    // 3D Bevel Extrusion
-    for (let depth = 8; depth >= 1; depth--) {
-      ctx.fillStyle = depth > 4 ? '#3e2723' : '#b78103';
-      ctx.fillText(team.name, depth, 90 + depth);
-    }
-
-    // Front Chrome Gold Gradient
-    const goldGrad = ctx.createLinearGradient(-400, 20, 400, 110);
-    goldGrad.addColorStop(0, '#ffffff');
-    goldGrad.addColorStop(0.2, '#fff176');
-    goldGrad.addColorStop(0.5, '#ffd700');
-    goldGrad.addColorStop(0.8, '#ff8f00');
-    goldGrad.addColorStop(1, '#ff6f00');
-
-    ctx.fillStyle = goldGrad;
-    ctx.shadowColor = 'rgba(255, 215, 0, 0.9)';
-    ctx.shadowBlur = 50;
-    ctx.fillText(team.name, 0, 90);
+    // 3. SUSPENSE CHARACTER-BY-CHARACTER RANDOM CHAMPION TEAM NAME REVEAL
+    const sceneTime = progress * 10.0;
+    this.renderSuspenseTeamName(ctx, team, 1, true, sceneTime, 10.0, time);
 
     // 4. Team Tagline
     if (team.tagline) {
@@ -864,21 +1406,14 @@ export class VideoEngine {
       ctx.fillText(team.tagline, 0, 155);
     }
 
-    // 5. Champion Ribbon Trim
-    ctx.strokeStyle = '#ffd700';
-    ctx.lineWidth = 4;
-    ctx.shadowBlur = 25;
-    ctx.beginPath();
-    ctx.moveTo(-360, 200);
-    ctx.lineTo(360, 200);
-    ctx.stroke();
-
-    ctx.font = '700 20px "Orbitron", sans-serif';
-    ctx.fillStyle = '#ffe082';
-    ctx.letterSpacing = '6px';
-    ctx.fillText("★ VICTORY & SUPREME EXCELLENCE ★", 0, 235);
+    // 5. Dynamic Decreasing Wait Timer Line & On-Screen Skip Button
+    const lineY = team.tagline ? 205 : 175;
+    this.renderTimerLineAndSkipBtn(ctx, this.getRankColor(1), sceneTime, 10.0, lineY, 350, true, time, scale, cx, cy);
 
     ctx.restore();
+
+    // 6. 10-SECOND WAIT TIMER SLIDER HUD OVERLAY ON CANVAS
+    this.renderRevealTimerHUD(sceneTime, 10.0, 1, true, time);
   }
 
   // Grand Finale / Podium Overview Scene

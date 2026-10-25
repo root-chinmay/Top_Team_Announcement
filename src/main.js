@@ -131,6 +131,15 @@ function initDOMElements() {
     btnExportVideo: document.getElementById('btnExportVideo'),
     exportText: document.getElementById('exportText'),
 
+    // 10-Second Reveal Wait Timer HUD & Skip Controls
+    btnOnScreenSkip: document.getElementById('btnOnScreenSkip'),
+    revealTimerHud: document.getElementById('revealTimerHud'),
+    hudCountdownSec: document.getElementById('hudCountdownSec'),
+    revealTimerSlider: document.getElementById('revealTimerSlider'),
+    hudSliderFill: document.getElementById('hudSliderFill'),
+    btnSkipWait: document.getElementById('btnSkipWait'),
+    btnSkipScene: document.getElementById('btnSkipScene'),
+
     // Header controls
     toggleAudioBtn: document.getElementById('toggleAudioBtn'),
     audioBtnText: document.getElementById('audioBtnText'),
@@ -147,7 +156,7 @@ function initVideoEngine() {
   videoEngine = new VideoEngine(dom.canvas);
 
   // Time update listener from engine
-  videoEngine.onTimeUpdate = (currentTime, duration) => {
+  videoEngine.onTimeUpdate = (currentTime, duration, activeScene) => {
     dom.videoScrubber.value = currentTime;
     dom.videoScrubber.max = duration;
 
@@ -155,6 +164,7 @@ function initVideoEngine() {
     dom.totalTimeDisplay.textContent = formatTime(duration);
 
     updateTimelineActiveMarker(currentTime);
+    updateRevealTimerHUD(currentTime, activeScene);
   };
 
   // Play / Pause state listener from engine
@@ -276,6 +286,41 @@ function attachEventListeners() {
     videoEngine.play();
   });
 
+  // Skip Wait button in HUD
+  if (dom.btnSkipWait) {
+    dom.btnSkipWait.addEventListener('click', (e) => {
+      e.stopPropagation();
+      videoEngine.skipCurrentWait();
+    });
+  }
+
+  // On-Screen Floating Skip Wait button on video stage
+  if (dom.btnOnScreenSkip) {
+    dom.btnOnScreenSkip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      videoEngine.skipCurrentWait();
+    });
+  }
+
+  // Skip Scene button in player controls
+  if (dom.btnSkipScene) {
+    dom.btnSkipScene.addEventListener('click', () => {
+      videoEngine.skipCurrentWait();
+    });
+  }
+
+  // Interactive 10s Reveal Wait Slider (Modern Web Guidance Range Slider)
+  if (dom.revealTimerSlider) {
+    dom.revealTimerSlider.addEventListener('input', (e) => {
+      const activeScene = videoEngine.getActiveScene();
+      if (activeScene && (activeScene.type === 'rank' || activeScene.type === 'champion')) {
+        const val = parseFloat(e.target.value);
+        videoEngine.seek(activeScene.start + val);
+        dom.revealTimerSlider.style.setProperty('--control-value', val);
+      }
+    });
+  }
+
   // Timeline Scrubber
   dom.videoScrubber.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
@@ -317,7 +362,7 @@ function attachEventListeners() {
     cycleTheme();
   });
 
-  // Keyboard Shortcuts: Spacebar to toggle play, R to restart
+  // Keyboard Shortcuts: Spacebar to toggle play, R to restart, S to skip wait
   window.addEventListener('keydown', (e) => {
     // Only if not currently typing in an input
     if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
@@ -331,6 +376,11 @@ function attachEventListeners() {
       if (state.currentStep === 3) {
         videoEngine.seek(0);
         videoEngine.play();
+      }
+    } else if (e.code === 'KeyS') {
+      if (state.currentStep === 3) {
+        e.preventDefault();
+        videoEngine.skipCurrentWait();
       }
     }
   });
@@ -651,6 +701,32 @@ function updateTimelineActiveMarker(currentTime) {
     const isActive = activeScene && Math.abs(activeScene.start - mStart) < 0.1;
     m.classList.toggle('active', isActive);
   });
+}
+
+// Dynamic 10-Second Wait Timer HUD updater
+function updateRevealTimerHUD(currentTime, activeScene) {
+  const isWaitScene = activeScene && (activeScene.type === 'rank' || activeScene.type === 'champion');
+
+  if (dom.btnOnScreenSkip) {
+    dom.btnOnScreenSkip.classList.toggle('visible', !!isWaitScene);
+  }
+
+  if (!dom.revealTimerHud) return;
+
+  if (isWaitScene) {
+    const elapsed = Math.max(0, Math.min(10.0, currentTime - activeScene.start));
+    const remaining = Math.max(0, 10.0 - elapsed);
+
+    dom.revealTimerHud.classList.add('visible');
+    dom.hudCountdownSec.textContent = `${remaining.toFixed(1)}s`;
+    dom.revealTimerSlider.value = elapsed;
+
+    const pct = (elapsed / 10.0) * 100;
+    dom.hudSliderFill.style.width = `${pct}%`;
+    dom.revealTimerSlider.style.setProperty('--control-value', elapsed);
+  } else {
+    dom.revealTimerHud.classList.remove('visible');
+  }
 }
 
 function formatTime(sec) {

@@ -42,6 +42,9 @@ class SoundEngine {
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.7, this.ctx.currentTime);
     }
+    if (this.isMuted) {
+      this.cancelSpeech();
+    }
     return this.isMuted;
   }
 
@@ -358,6 +361,106 @@ class SoundEngine {
 
     // Sub thump on tick
     this.playSnareTap(t, num === 1 ? 0.4 : 0.2, 180);
+  }
+
+  // Suspense Character-by-Character Decipher Lock-In Tick
+  playDecipherTick(charIndex = 1, totalChars = 10) {
+    if (this.isMuted || !this.ctx) return;
+    this.ensureContext();
+    const t = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    // Ascending electronic decipher tone from 520Hz up to 1480Hz
+    const progress = Math.min(1, Math.max(0, charIndex / Math.max(1, totalChars)));
+    const baseFreq = 540 + progress * 940;
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(baseFreq, t);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.4, t + 0.05);
+
+    gain.gain.setValueAtTime(0.18, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.058);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(t);
+    osc.stop(t + 0.062);
+
+    // Subtle metallic click transient
+    this.playNoiseTransient(t, 0.025, 3200);
+  }
+
+  // Quick cyber swoosh when skipping a wait period
+  playSkipWhoosh() {
+    if (this.isMuted || !this.ctx) return;
+    this.ensureContext();
+    const t = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(450, t);
+    osc.frequency.exponentialRampToValueAtTime(110, t + 0.16);
+
+    gain.gain.setValueAtTime(0.22, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(t);
+    osc.stop(t + 0.17);
+  }
+
+  // Announce an individual alphabet: plays musical decipher chime + speaks the alphabet
+  playLetterAnnounce(char = '', charIndex = 1, totalChars = 10) {
+    this.playDecipherTick(charIndex, totalChars);
+    this.speakChar(char);
+  }
+
+  // Voice speech synthesis for individual alphabet
+  speakChar(char) {
+    if (this.isMuted || !char || typeof window === 'undefined' || !window.speechSynthesis) return;
+    try {
+      // Announce letters and digits only (skip spaces or symbols)
+      if (!/[a-zA-Z0-9]/.test(char)) return;
+
+      const utter = new SpeechSynthesisUtterance(char.toUpperCase());
+      utter.rate = 1.3;
+      utter.pitch = 1.05;
+      utter.volume = 0.85;
+      window.speechSynthesis.speak(utter);
+    } catch (e) {
+      // Speech synthesis is non-blocking fallback
+    }
+  }
+
+  // Voice announcement for full team name upon complete reveal
+  announceTeamName(name = '', rank = 1) {
+    if (this.isMuted || !name || typeof window === 'undefined' || !window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(name);
+      utter.rate = 1.05;
+      utter.pitch = 1.08;
+      utter.volume = 0.95;
+      window.speechSynthesis.speak(utter);
+    } catch (e) {
+      // Non-blocking fallback
+    }
+  }
+
+  // Cancel any ongoing speech synthesis (e.g. on seek, pause, or skip)
+  cancelSpeech() {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+    }
   }
 }
 
